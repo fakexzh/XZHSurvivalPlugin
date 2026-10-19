@@ -80,7 +80,7 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
             private int index = 0;
             @Override public void run() {
                 int removedThisTick = 0;
-                while (index < leaves.size() && removedThisTick < 8) {
+                while (index < leaves.size() && removedThisTick < 2) {
                     Block leaf = leaves.get(index++);
                     if (leaf.getBlockData() instanceof Leaves) {
                         leaf.getWorld().spawnParticle(org.bukkit.Particle.BLOCK, leaf.getLocation().add(0.5, 0.5, 0.5),
