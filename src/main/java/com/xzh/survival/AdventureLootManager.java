@@ -111,8 +111,21 @@ public final class AdventureLootManager implements Listener {
                     Material.GOLD_INGOT, Material.DIAMOND};
             reward = rare[random.nextInt(rare.length)];
         } else {
-            Material[] ordinary = {Material.IRON_INGOT, Material.GOLD_NUGGET, Material.STRING,
-                    Material.LEATHER, Material.BONE, Material.BOOK, Material.COPPER_INGOT};
+            String biome = caught.getLocation().getBlock().getBiome().name();
+            Material[] ordinary;
+            if (biome.contains("OCEAN") || biome.contains("BEACH")) {
+                ordinary = new Material[]{Material.NAUTILUS_SHELL, Material.PRISMARINE_SHARD, Material.INK_SAC,
+                        Material.COD, Material.SALMON, Material.GOLD_NUGGET};
+            } else if (biome.contains("RIVER") || biome.contains("SWAMP")) {
+                ordinary = new Material[]{Material.CLAY_BALL, Material.LILY_PAD, Material.SLIME_BALL,
+                        Material.INK_SAC, Material.STRING, Material.BOOK};
+            } else if (biome.contains("JUNGLE")) {
+                ordinary = new Material[]{Material.BAMBOO, Material.COCOA_BEANS, Material.TROPICAL_FISH,
+                        Material.BONE, Material.STRING, Material.GOLD_NUGGET};
+            } else {
+                ordinary = new Material[]{Material.IRON_INGOT, Material.GOLD_NUGGET, Material.STRING,
+                        Material.LEATHER, Material.BONE, Material.BOOK, Material.COPPER_INGOT};
+            }
             reward = ordinary[random.nextInt(ordinary.length)];
         }
         Item extra = event.getPlayer().getWorld().dropItemNaturally(caught.getLocation(), createLootItem(reward));
