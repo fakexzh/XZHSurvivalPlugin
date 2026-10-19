@@ -93,6 +93,10 @@ public final class DynamicTradingManager implements Listener {
         addOffer(offers, createOfficialCoin(10, 13 + random.nextInt(3)), new ItemStack(Material.IRON_INGOT, 16));
         addOffer(offers, createOfficialCoin(10, 5 + random.nextInt(2)), new ItemStack(Material.GOLD_INGOT, 4));
         addOffer(offers, createOfficialCoin(1, 4 + random.nextInt(3)), new ItemStack(Material.DIAMOND, 1));
+        addOffer(offers, createOfficialCoin(1, 6 + random.nextInt(5)), new ItemStack(Material.COPPER_INGOT, 16));
+        addOffer(offers, createOfficialCoin(1, 4 + random.nextInt(4)), new ItemStack(Material.LAPIS_LAZULI, 16));
+        addOffer(offers, createOfficialCoin(1, 5 + random.nextInt(5)), new ItemStack(Material.LEATHER, 8));
+        addOffer(offers, createOfficialCoin(1, 3 + random.nextInt(3)), new ItemStack(Material.STRING, 16));
 
         // Limited rotating stock: a player can buy each special item once per refresh cycle.
         Material[] stockPool = wandering
