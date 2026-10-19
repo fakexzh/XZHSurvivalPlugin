@@ -42,6 +42,7 @@ mob-progression:
   maximum-extra-health: 20.0
   speed-effect-start-level: 15
   special-abilities-start-level: 20
+  special-block-building-enabled: true
 
 adventure-loot:
   enabled: true
