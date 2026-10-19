@@ -20,6 +20,8 @@ import org.bukkit.entity.Monster;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Projectile;
 import org.bukkit.entity.TextDisplay;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.CreatureSpawnEvent;
@@ -192,6 +194,11 @@ public final class SurvivalFeatureManager implements Listener {
     }
 
     private void applyMonsterProgression(Monster monster, int level) {
+        int speedStart = Math.max(1, plugin.getConfig().getInt("mob-progression.speed-effect-start-level", 15));
+        if (level >= speedStart) {
+            int amplifier = level >= 60 ? 1 : 0;
+            monster.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 20 * 60 * 10, amplifier, true, false, false));
+        }
         if (level >= 3) {
             AttributeInstance maxHealth = monster.getAttribute(Attribute.MAX_HEALTH);
             if (maxHealth != null) {
@@ -227,9 +234,17 @@ public final class SurvivalFeatureManager implements Listener {
         }
 
         ItemStack weapon = equipment.getItemInMainHand();
+        double weaponEnchantChance = Math.min(0.45, 0.06 + level * 0.004);
         if (level >= 3 && weapon != null && !weapon.getType().isAir()
-                && random.nextDouble() < 0.12 * (level - 2)) {
-            addEnchantment(weapon, weapon.getType() == Material.BOW ? "power" : "sharpness", 1);
+                && random.nextDouble() < weaponEnchantChance) {
+            if (weapon.getType() == Material.BOW) {
+                addEnchantment(weapon, "power", 1);
+                if (level >= 20 && random.nextDouble() < 0.15) addEnchantment(weapon, "flame", 1);
+            } else {
+                addEnchantment(weapon, "sharpness", level >= 30 && random.nextDouble() < 0.15 ? 2 : 1);
+                if (level >= 20 && random.nextDouble() < 0.10) addEnchantment(weapon, "fire_aspect", 1);
+                if (level >= 35 && random.nextDouble() < 0.10) addEnchantment(weapon, "knockback", 1);
+            }
             equipment.setItemInMainHand(weapon);
         }
 
