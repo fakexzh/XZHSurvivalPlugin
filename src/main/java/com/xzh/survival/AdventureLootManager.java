@@ -2,6 +2,8 @@ package com.xzh.survival;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
+import org.bukkit.block.Chest;
+import org.bukkit.block.BlockState;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Item;
@@ -27,11 +29,13 @@ public final class AdventureLootManager implements Listener {
     private final JavaPlugin plugin;
     private final Random random = new Random();
     private final NamespacedKey mobLootKey;
+    private final NamespacedKey villageChestCheckedKey;
     private final Set<UUID> announcedMobDrops = new HashSet<>();
 
     public AdventureLootManager(JavaPlugin plugin) {
         this.plugin = plugin;
         mobLootKey = new NamespacedKey(plugin, "mob_loot_pickup");
+        villageChestCheckedKey = new NamespacedKey(plugin, "village_coin_checked");
     }
 
     public void start() {
@@ -120,6 +124,31 @@ public final class AdventureLootManager implements Listener {
                 && announcedMobDrops.add(item.getUniqueId())) {
             event.getPlayer().sendMessage("§a[Loot] §f+" + stack.getAmount() + " " + prettyName(stack.getType()));
         }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onVillageChestOpen(InventoryOpenEvent event) {
+        if (!(event.getPlayer() instanceof Player player)
+                || !plugin.getConfig().getBoolean("adventure-loot.enabled", true)) return;
+        if (!plugin.getConfig().getBoolean("adventure-loot.exploration.village-chest-rewards-enabled", true)) return;
+        if (event.getInventory().getLocation() == null) return;
+        BlockState state = event.getInventory().getLocation().getBlock().getState();
+        if (!(state instanceof Chest chest)) return;
+        if (chest.getPersistentDataContainer().has(villageChestCheckedKey, PersistentDataType.BYTE)) return;
+
+        boolean villageNearby = chest.getWorld().getNearbyEntities(chest.getLocation(), 32, 16, 32).stream()
+                .anyMatch(entity -> entity instanceof org.bukkit.entity.Villager);
+        if (!villageNearby) return;
+        // Mark every checked village chest, including misses, to prevent rerolls by reopening it.
+        chest.getPersistentDataContainer().set(villageChestCheckedKey, PersistentDataType.BYTE, (byte) 1);
+        chest.update(true, false);
+        double chance = plugin.getConfig().getDouble("adventure-loot.exploration.village-chest-coin-chance", 0.12);
+        if (random.nextDouble() >= chance) return;
+        ItemStack coin = rollCoinReward("adventure-loot.mob-loot");
+        if (coin == null) return;
+        Map<Integer, ItemStack> overflow = chest.getBlockInventory().addItem(coin);
+        for (ItemStack item : overflow.values()) chest.getWorld().dropItemNaturally(chest.getLocation(), item);
+        player.sendMessage("§6[XZH] §eYou discovered XZH coins hidden in this village chest!");
     }
 
     @EventHandler(ignoreCancelled = true)
