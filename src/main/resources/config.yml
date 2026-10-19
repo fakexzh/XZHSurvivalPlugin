@@ -25,17 +25,64 @@ death:
     maximum-bank-penalty: 500
 
 custom-time:
-  # Disabled by default so existing worlds keep their normal daylight cycle until configured.
+  # Disabled by default; when off, vanilla daylight cycling must remain enabled.
   enabled: false
   day-duration-seconds: 1800
   night-duration-seconds: 1800
 
-# Mob strength scales with each player's own accumulated online playtime.
+# Individual lifetime online playtime; level 1 at start, +1 per 3 accumulated hours.
 mob-progression:
   enabled: true
   hours-per-level: 3
-  maximum-level: 5
+  maximum-level: 100
   player-detection-range: 48.0
+  equipment-chance-base: 0.08
+  equipment-chance-per-level: 0.004
+  maximum-equipment-chance: 0.45
+  maximum-extra-health: 20.0
+  speed-effect-start-level: 15
+  special-abilities-start-level: 20
+
+adventure-loot:
+  enabled: true
+  mob-loot:
+    enabled: true
+    first-pickup-announcements: true
+    common-extra-chance: 0.12
+    rare-extra-chance: 0.025
+    extreme-rare-chance: 0.001
+    coin-drop-chance: 0.15
+    coin-10-chance: 0.025
+    coin-100-chance: 0.001
+    coin-1000-chance: 0.0001
+    multiple-coins-chance: 0.005
+  fishing:
+    enabled: true
+    bonus-reward-chance: 0.20
+    rare-reward-chance: 0.035
+    extreme-rare-chance: 0.001
+    coin-chance: 0.06
+  exploration:
+    village-chest-coin-chance: 0.12
+    piglin-barter-coin-chance: 0.04
+  pickup-messages:
+    mob-loot-first-pickup-only: true
+    coins-every-pickup: true
+    coin-announcements-global: false
+
+dynamic-trading:
+  enabled: true
+  refresh-minutes: 30
+  villager:
+    special-offer-purchases-per-refresh: 1
+    player-sell-premium-min-percent: 5
+    player-sell-premium-max-percent: 30
+  wandering-trader:
+    special-offer-purchases-per-refresh: 1
+    player-sell-premium-min-percent: 5
+    player-sell-premium-max-percent: 30
+  compare-against-economy-shop: true
+  prevent-buy-sell-arbitrage: true
 
 # TAB player list and lightweight combat feedback.
 combat-indicators:
