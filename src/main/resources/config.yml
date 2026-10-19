@@ -1,0 +1,25 @@
+tree-felling:
+  enabled: true
+  minimum-axe: IRON
+  minimum-leaves: 6
+  maximum-logs: 256
+  require-sneak-to-disable: true
+
+death:
+  enabled: true
+  xp-loss-min-percent: 25
+  xp-loss-max-percent: 50
+  overworld:
+    keep-inventory: false
+    no-home-penalty: 50
+    minimum-bank-penalty: 10
+    maximum-bank-penalty: 100
+    distance-cap-blocks: 1000
+  nether:
+    keep-inventory: true
+    minimum-bank-penalty: 100
+    maximum-bank-penalty: 200
+  end:
+    keep-inventory: true
+    minimum-bank-penalty: 200
+    maximum-bank-penalty: 500
