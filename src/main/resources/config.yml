@@ -63,6 +63,7 @@ adventure-loot:
     extreme-rare-chance: 0.001
     coin-chance: 0.06
   exploration:
+    village-chest-rewards-enabled: true
     village-chest-coin-chance: 0.12
     piglin-barter-coin-chance: 0.04
   pickup-messages:
