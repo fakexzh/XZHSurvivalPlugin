@@ -2,6 +2,8 @@ package com.xzh.survival;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
+import org.bukkit.enchantments.Enchantment;
+import org.bukkit.inventory.meta.EnchantmentStorageMeta;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
@@ -93,15 +95,26 @@ public final class DynamicTradingManager implements Listener {
         addOffer(offers, createOfficialCoin(1, 4 + random.nextInt(3)), new ItemStack(Material.DIAMOND, 1));
 
         // Limited rotating stock: a player can buy each special item once per refresh cycle.
-        ItemStack stock = new ItemStack(wandering ? Material.SADDLE : Material.NAME_TAG, 1);
+        Material[] stockPool = wandering
+                ? new Material[]{Material.SADDLE, Material.NAME_TAG, Material.IRON_HORSE_ARMOR, Material.GOLDEN_HORSE_ARMOR}
+                : new Material[]{Material.NAME_TAG, Material.ENCHANTED_BOOK, Material.SADDLE, Material.GOLDEN_APPLE};
+        Material selectedStock = stockPool[random.nextInt(stockPool.length)];
+        ItemStack stock = new ItemStack(selectedStock, 1);
         ItemMeta meta = stock.getItemMeta();
         if (meta != null) {
-            meta.setDisplayName(wandering ? "§dWandering Trader's Limited Saddle" : "§dVillager's Limited Name Tag");
+            meta.setDisplayName("§d" + (wandering ? "Wandering Trader's Limited " : "Villager's Limited ") + selectedStock.name().toLowerCase(Locale.ROOT).replace('_', ' '));
             meta.getPersistentDataContainer().set(specialKey, PersistentDataType.BYTE, (byte) 1);
             stock.setItemMeta(meta);
         }
         addOffer(offers, stock, createOfficialCoin(10, 1));
-        ItemStack rare = new ItemStack(wandering ? Material.EXPERIENCE_BOTTLE : Material.ENCHANTED_BOOK, 3);
+        ItemStack rare = new ItemStack(wandering ? Material.EXPERIENCE_BOTTLE : Material.ENCHANTED_BOOK, 1);
+        if (!wandering && rare.getItemMeta() instanceof EnchantmentStorageMeta bookMeta) {
+            Enchantment[] choices = {Enchantment.MENDING, Enchantment.UNBREAKING, Enchantment.EFFICIENCY,
+                    Enchantment.FORTUNE, Enchantment.SILK_TOUCH, Enchantment.PROTECTION, Enchantment.SHARPNESS};
+            Enchantment enchantment = choices[random.nextInt(choices.length)];
+            bookMeta.addStoredEnchant(enchantment, Math.min(enchantment.getMaxLevel(), 1 + random.nextInt(enchantment.getMaxLevel())), true);
+            rare.setItemMeta(bookMeta);
+        }
         ItemMeta rareMeta = rare.getItemMeta();
         if (rareMeta != null) {
             rareMeta.setDisplayName("§5Limited XZH Supply");
