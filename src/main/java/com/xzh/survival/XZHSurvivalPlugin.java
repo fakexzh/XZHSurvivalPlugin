@@ -38,6 +38,7 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
     private final Map<UUID, Integer> pendingXpRestore = new HashMap<>();
     private CustomTimeManager customTimeManager;
     private SurvivalFeatureManager survivalFeatureManager;
+    private AdventureLootManager adventureLootManager;
 
     @Override
     public void onEnable() {
@@ -47,6 +48,8 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         customTimeManager.start();
         survivalFeatureManager = new SurvivalFeatureManager(this);
         survivalFeatureManager.start();
+        adventureLootManager = new AdventureLootManager(this);
+        adventureLootManager.start();
         getLogger().info("XZH Survival Plugin enabled.");
     }
 
