@@ -51,6 +51,7 @@ public final class SurvivalFeatureManager implements Listener {
     private final Map<UUID, TextDisplay> healthDisplays = new HashMap<>();
     private final Map<UUID, UUID> healthTargets = new HashMap<>();
     private final NamespacedKey monsterLevelKey;
+    private final NamespacedKey builtStepKey;
     private final File playtimeFile;
     private final YamlConfiguration playtimeData = new YamlConfiguration();
     private BukkitTask ticker;
@@ -59,6 +60,7 @@ public final class SurvivalFeatureManager implements Listener {
     public SurvivalFeatureManager(JavaPlugin plugin) {
         this.plugin = plugin;
         this.monsterLevelKey = new NamespacedKey(plugin, "monster_level");
+        this.builtStepKey = new NamespacedKey(plugin, "monster_built_step");
         this.playtimeFile = new File(plugin.getDataFolder(), "playtime.yml");
     }
 
@@ -71,6 +73,7 @@ public final class SurvivalFeatureManager implements Listener {
             updateTab(player);
         }
         ticker = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, 20L, 20L);
+        Bukkit.getScheduler().runTaskTimer(plugin, this::tryMonsterBuilding, 60L, 60L);
     }
 
     public void shutdown() {
@@ -191,6 +194,41 @@ public final class SurvivalFeatureManager implements Listener {
             }
         }
         return nearest;
+    }
+
+    private void tryMonsterBuilding() {
+        if (!plugin.getConfig().getBoolean("mob-progression.enabled", true)
+                || !plugin.getConfig().getBoolean("mob-progression.special-block-building-enabled", true)) return;
+        for (World world : Bukkit.getWorlds()) {
+            for (Entity entity : world.getEntities()) {
+                if (!(entity instanceof Monster monster) || monster.isDead()) continue;
+                int level = monster.getPersistentDataContainer().getOrDefault(monsterLevelKey, PersistentDataType.INTEGER, 1);
+                int startLevel = Math.max(1, plugin.getConfig().getInt("mob-progression.special-abilities-start-level", 20));
+                if (level < startLevel || monster.getPersistentDataContainer().has(builtStepKey, PersistentDataType.BYTE)) continue;
+                if (random.nextDouble() > Math.min(0.08, 0.01 + level * 0.0007)) continue;
+                Player target = findNearestPlayer(monster.getLocation(), 12.0);
+                if (target == null || target.getLocation().getY() <= monster.getLocation().getY() + 0.8) continue;
+                BlockFace face = yawToFace(monster.getLocation().getYaw());
+                Block step = monster.getLocation().getBlock().getRelative(face);
+                Block floor = step.getRelative(0, -1, 0);
+                if (!step.getType().isAir() || !floor.getType().isSolid() || step.isLiquid()) continue;
+                step.setType(Material.DIRT, false);
+                monster.getPersistentDataContainer().set(builtStepKey, PersistentDataType.BYTE, (byte) 1);
+                Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    if (step.getType() == Material.DIRT) step.setType(Material.AIR, false);
+                }, 20L * 15L);
+            }
+        }
+    }
+
+    private BlockFace yawToFace(float yaw) {
+        int direction = Math.floorMod(Math.round(yaw / 90.0f), 4);
+        return switch (direction) {
+            case 0 -> BlockFace.SOUTH;
+            case 1 -> BlockFace.WEST;
+            case 2 -> BlockFace.NORTH;
+            default -> BlockFace.EAST;
+        };
     }
 
     private void applyMonsterProgression(Monster monster, int level) {
