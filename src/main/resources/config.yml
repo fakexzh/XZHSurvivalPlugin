@@ -23,3 +23,9 @@ death:
     keep-inventory: true
     minimum-bank-penalty: 200
     maximum-bank-penalty: 500
+
+custom-time:
+  # Disabled by default so existing worlds keep their normal daylight cycle until configured.
+  enabled: false
+  day-duration-seconds: 1800
+  night-duration-seconds: 1800
