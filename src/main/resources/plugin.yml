@@ -8,3 +8,10 @@ permissions:
   xzhsurvival.admin:
     description: Bypass tree-felling restrictions
     default: op
+
+commands:
+  customtime:
+    description: Configure custom day and night lengths
+    usage: /customtime <set|info|on|off>
+    aliases: [ct]
+    permission: xzhsurvival.admin
