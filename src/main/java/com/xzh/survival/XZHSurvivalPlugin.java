@@ -7,7 +7,10 @@ import org.bukkit.Tag;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.data.type.Leaves;
+import org.bukkit.entity.Item;
 import org.bukkit.entity.Player;
+import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.util.Vector;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
@@ -31,6 +34,7 @@ import java.util.UUID;
 
 public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
     private final Random random = new Random();
+    private final Map<UUID, Integer> pendingXpRestore = new HashMap<>();
 
     @Override
     public void onEnable() {
@@ -54,7 +58,8 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
 
         List<Block> logs = collectConnectedLogs(start,
                 getConfig().getInt("tree-felling.maximum-logs", 256));
-        if (logs.size() < 2 || countNearbyLeaves(logs) <
+        List<Block> leaves = collectNearbyLeaves(logs);
+        if (logs.size() < 2 || leaves.size() <
                 getConfig().getInt("tree-felling.minimum-leaves", 6)) return;
 
         Map<Material, Integer> totals = new HashMap<>();
@@ -67,9 +72,26 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         // Take over the break so vanilla cannot re-break the first log or duplicate drops.
         event.setDropItems(false);
         event.setCancelled(true);
+        playWoodFlyAnimation(player, logs);
         for (Block log : logs) {
             log.setType(Material.AIR, false);
         }
+        new BukkitRunnable() {
+            private int index = 0;
+            @Override public void run() {
+                int removedThisTick = 0;
+                while (index < leaves.size() && removedThisTick < 8) {
+                    Block leaf = leaves.get(index++);
+                    if (leaf.getBlockData() instanceof Leaves) {
+                        leaf.getWorld().spawnParticle(org.bukkit.Particle.BLOCK, leaf.getLocation().add(0.5, 0.5, 0.5),
+                                3, 0.2, 0.2, 0.2, leaf.getBlockData());
+                        leaf.setType(Material.AIR, false);
+                    }
+                    removedThisTick++;
+                }
+                if (index >= leaves.size()) cancel();
+            }
+        }.runTaskTimer(this, 1L, 1L);
         for (Map.Entry<Material, Integer> entry : totals.entrySet()) {
             int amount = entry.getValue();
             while (amount > 0) {
@@ -106,21 +128,51 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         return found;
     }
 
-    private int countNearbyLeaves(List<Block> logs) {
-        Set<String> leaves = new HashSet<>();
+    private List<Block> collectNearbyLeaves(List<Block> logs) {
+        Map<String, Block> leaves = new HashMap<>();
         for (Block log : logs) {
             for (int x = -4; x <= 4; x++) {
                 for (int y = -3; y <= 6; y++) {
                     for (int z = -4; z <= 4; z++) {
                         Block nearby = log.getRelative(x, y, z);
                         if (nearby.getBlockData() instanceof Leaves) {
-                            leaves.add(nearby.getX() + ":" + nearby.getY() + ":" + nearby.getZ());
+                            String key = nearby.getX() + ":" + nearby.getY() + ":" + nearby.getZ();
+                            leaves.putIfAbsent(key, nearby);
                         }
                     }
                 }
             }
         }
-        return leaves.size();
+        return new ArrayList<>(leaves.values());
+    }
+
+    private void playWoodFlyAnimation(Player player, List<Block> logs) {
+        int stride = Math.max(1, (int) Math.ceil(logs.size() / 16.0));
+        for (int i = 0; i < logs.size(); i += stride) {
+            Block log = logs.get(i);
+            Item visual = log.getWorld().dropItem(log.getLocation().add(0.5, 0.5, 0.5),
+                    new ItemStack(log.getType(), 1));
+            visual.setPickupDelay(Integer.MAX_VALUE);
+            visual.setGravity(false);
+            new BukkitRunnable() {
+                private int ticks = 0;
+                @Override public void run() {
+                    if (!player.isOnline() || visual.isDead() || ticks++ >= 12) {
+                        visual.remove();
+                        cancel();
+                        return;
+                    }
+                    Location target = player.getLocation().add(0, 1.0, 0);
+                    Vector direction = target.toVector().subtract(visual.getLocation().toVector());
+                    if (direction.lengthSquared() < 1.0) {
+                        visual.remove();
+                        cancel();
+                        return;
+                    }
+                    visual.setVelocity(direction.normalize().multiply(0.75));
+                }
+            }.runTaskTimer(XZHSurvivalPlugin.this, 1L, 1L);
+        }
     }
 
     private boolean hasInventorySpace(PlayerInventory inventory, Map<Material, Integer> totals) {
@@ -161,21 +213,28 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
 
         boolean keep = getConfig().getBoolean("death." + dimension + ".keep-inventory",
                 !dimension.equals("overworld"));
+        int totalXp = Math.max(0, player.getTotalExperience());
         if (keep) {
             event.setKeepInventory(true);
             event.getDrops().clear();
         } else {
-            // Explicitly preserve normal Overworld item-drop behavior.
             event.setKeepInventory(false);
+            // If keepInventory gamerule left Bukkit's list empty, explicitly add the
+            // player's inventory so the Overworld death cannot silently erase it.
+            if (event.getDrops().isEmpty()) {
+                for (ItemStack item : player.getInventory().getContents()) {
+                    if (item != null && !item.getType().isAir()) event.getDrops().add(item.clone());
+                }
+            }
         }
 
-        // Preserve vanilla XP drops, reducing them by the configured percentage.
-        // Setting dropped XP to zero caused all XP to disappear instead of dropping.
         int min = getConfig().getInt("death.xp-loss-min-percent", 25);
         int max = getConfig().getInt("death.xp-loss-max-percent", 50);
         int percent = min + random.nextInt(Math.max(1, max - min + 1));
-        int vanillaDroppedXp = Math.max(0, event.getDroppedExp());
-        event.setDroppedExp(Math.max(0, Math.round(vanillaDroppedXp * (100 - percent) / 100.0f)));
+        int loss = Math.round(totalXp * percent / 100.0f);
+        pendingXpRestore.put(player.getUniqueId(), Math.max(0, totalXp - loss));
+        // Overworld loss becomes XP orbs; Nether/End keep inventory and lose XP on respawn.
+        event.setDroppedExp(keep ? 0 : loss);
 
         int penalty;
         if (dimension.equals("overworld")) {
@@ -187,6 +246,20 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         }
         deductBank(player, penalty);
         player.sendMessage("§cDeath penalty: §f" + penalty + " coins from your bank. §7XP loss: " + percent + "%.");
+    }
+
+    @EventHandler
+    public void onRespawn(org.bukkit.event.player.PlayerRespawnEvent event) {
+        UUID id = event.getPlayer().getUniqueId();
+        Integer remainingXp = pendingXpRestore.remove(id);
+        if (remainingXp == null) return;
+        Bukkit.getScheduler().runTask(this, () -> {
+            Player player = event.getPlayer();
+            player.setTotalExperience(0);
+            player.setLevel(0);
+            player.setExp(0.0f);
+            player.giveExp(remainingXp);
+        });
     }
 
     private int overworldPenalty(Player player) {
