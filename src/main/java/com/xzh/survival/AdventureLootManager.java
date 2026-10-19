@@ -44,6 +44,13 @@ public final class AdventureLootManager implements Listener {
                 || !plugin.getConfig().getBoolean("adventure-loot.mob-loot.enabled", true)) return;
         LivingEntity mob = event.getEntity();
         if (mob.getKiller() == null) return;
+        // Tag vanilla mob drops one tick later so each dropped item gets a first-pickup notice.
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            if (!mob.getWorld().isChunkLoaded(mob.getLocation().getBlockX() >> 4, mob.getLocation().getBlockZ() >> 4)) return;
+            for (Entity nearby : mob.getNearbyEntities(4.0, 4.0, 4.0)) {
+                if (nearby instanceof Item dropped && !isXzhCoin(dropped.getItemStack())) markMobLoot(dropped);
+            }
+        });
         double rare = plugin.getConfig().getDouble("adventure-loot.mob-loot.rare-extra-chance", 0.025);
         double common = plugin.getConfig().getDouble("adventure-loot.mob-loot.common-extra-chance", 0.12);
         if (random.nextDouble() < common) {
@@ -59,7 +66,7 @@ public final class AdventureLootManager implements Listener {
         }
         double coinChance = plugin.getConfig().getDouble("adventure-loot.mob-loot.coin-drop-chance", 0.15);
         if (random.nextDouble() < coinChance) {
-            ItemStack coin = createOfficialCoin(1 + random.nextInt(1), 1);
+            ItemStack coin = rollCoinReward("adventure-loot.mob-loot");
             if (coin != null) event.getDrops().add(coin);
         }
         if (random.nextDouble() < plugin.getConfig().getDouble("adventure-loot.mob-loot.extreme-rare-chance", 0.001)) {
@@ -76,11 +83,8 @@ public final class AdventureLootManager implements Listener {
         if (!(event.getCaught() instanceof Item caught)) return;
         double coinChance = plugin.getConfig().getDouble("adventure-loot.fishing.coin-chance", 0.06);
         if (random.nextDouble() < coinChance) {
-            ItemStack coin = createOfficialCoin(1, 1);
-            if (coin != null) {
-                event.getPlayer().getWorld().dropItemNaturally(caught.getLocation(), coin);
-                event.getPlayer().sendMessage("§6[XZH] §aA coin was caught while fishing!");
-            }
+            ItemStack coin = rollCoinReward("adventure-loot.mob-loot");
+            if (coin != null) event.getPlayer().getWorld().dropItemNaturally(caught.getLocation(), coin);
         }
         double bonusChance = plugin.getConfig().getDouble("adventure-loot.fishing.bonus-reward-chance", 0.20);
         if (random.nextDouble() >= bonusChance) return;
@@ -120,15 +124,26 @@ public final class AdventureLootManager implements Listener {
 
     @EventHandler(ignoreCancelled = true)
     public void onItemSpawn(ItemSpawnEvent event) {
-        // Only item entities tagged by our own mob/fishing bonus logic are announced as loot.
-        // Vanilla mob drops are marked by the death event below through a short scheduled scan.
+        // Vanilla mob drops are tagged by the one-tick scan scheduled in onMobDeath.
     }
 
     @EventHandler(ignoreCancelled = true)
     public void onPiglinBarter(PiglinBarterEvent event) {
         if (!plugin.getConfig().getBoolean("adventure-loot.enabled", true)
                 || random.nextDouble() >= plugin.getConfig().getDouble("adventure-loot.exploration.piglin-barter-coin-chance", 0.04)) return;
-        event.getOutcome().add(new ItemStack(Material.GOLD_NUGGET, 1 + random.nextInt(3)));
+        ItemStack coin = rollCoinReward("adventure-loot.mob-loot");
+        if (coin != null) event.getOutcome().add(coin);
+    }
+
+    private ItemStack rollCoinReward(String path) {
+        // Higher denominations are intentionally rare; the economy plugin creates the authentic coin.
+        double jackpot = plugin.getConfig().getDouble(path + ".coin-1000-chance", 0.0001);
+        double hundred = plugin.getConfig().getDouble(path + ".coin-100-chance", 0.001);
+        double ten = plugin.getConfig().getDouble(path + ".coin-10-chance", 0.025);
+        double roll = random.nextDouble();
+        int denomination = roll < jackpot ? 1000 : roll < jackpot + hundred ? 100 : roll < jackpot + hundred + ten ? 10 : 1;
+        int amount = random.nextDouble() < plugin.getConfig().getDouble(path + ".multiple-coins-chance", 0.005) ? 2 + random.nextInt(3) : 1;
+        return createOfficialCoin(denomination, amount);
     }
 
     private ItemStack createOfficialCoin(int denomination, int amount) {
