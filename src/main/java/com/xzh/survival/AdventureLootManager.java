@@ -34,7 +34,7 @@ public final class AdventureLootManager implements Listener {
     private final NamespacedKey villageChestCheckedKey;
     private final NamespacedKey monsterLevelKey;
     private final NamespacedKey fishingQuestProgressKey;
-    private final Set<UUID> announcedMobDrops = new HashSet<>();
+    private final NamespacedKey pickupAnnouncedKey;
 
     public AdventureLootManager(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -42,6 +42,7 @@ public final class AdventureLootManager implements Listener {
         villageChestCheckedKey = new NamespacedKey(plugin, "village_coin_checked");
         monsterLevelKey = new NamespacedKey(plugin, "monster_level");
         fishingQuestProgressKey = new NamespacedKey(plugin, "fishing_quest_progress");
+        pickupAnnouncedKey = new NamespacedKey(plugin, "loot_pickup_announced");
     }
 
     public void start() {
@@ -152,7 +153,8 @@ public final class AdventureLootManager implements Listener {
         if (plugin.getConfig().getBoolean("adventure-loot.mob-loot.first-pickup-announcements", true)
                 && plugin.getConfig().getBoolean("adventure-loot.pickup-messages.mob-loot-first-pickup-only", true)
                 && item.getPersistentDataContainer().has(mobLootKey, PersistentDataType.BYTE)
-                && announcedMobDrops.add(item.getUniqueId())) {
+                && !item.getPersistentDataContainer().has(pickupAnnouncedKey, PersistentDataType.BYTE)) {
+            item.getPersistentDataContainer().set(pickupAnnouncedKey, PersistentDataType.BYTE, (byte) 1);
             event.getPlayer().sendMessage("§a[Loot] §f+" + stack.getAmount() + " " + prettyName(stack.getType()));
         }
     }
