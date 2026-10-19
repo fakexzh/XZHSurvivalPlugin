@@ -1,6 +1,6 @@
 tree-felling:
   enabled: true
-  minimum-axe: IRON
+  minimum-axe: WOODEN
   minimum-leaves: 6
   maximum-logs: 256
   require-sneak-to-disable: true
