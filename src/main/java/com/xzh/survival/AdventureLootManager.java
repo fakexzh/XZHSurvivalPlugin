@@ -30,12 +30,14 @@ public final class AdventureLootManager implements Listener {
     private final Random random = new Random();
     private final NamespacedKey mobLootKey;
     private final NamespacedKey villageChestCheckedKey;
+    private final NamespacedKey monsterLevelKey;
     private final Set<UUID> announcedMobDrops = new HashSet<>();
 
     public AdventureLootManager(JavaPlugin plugin) {
         this.plugin = plugin;
         mobLootKey = new NamespacedKey(plugin, "mob_loot_pickup");
         villageChestCheckedKey = new NamespacedKey(plugin, "village_coin_checked");
+        monsterLevelKey = new NamespacedKey(plugin, "monster_level");
     }
 
     public void start() {
@@ -55,8 +57,9 @@ public final class AdventureLootManager implements Listener {
                 if (nearby instanceof Item dropped && !isXzhCoin(dropped.getItemStack())) markMobLoot(dropped);
             }
         });
-        double rare = plugin.getConfig().getDouble("adventure-loot.mob-loot.rare-extra-chance", 0.025);
-        double common = plugin.getConfig().getDouble("adventure-loot.mob-loot.common-extra-chance", 0.12);
+        int mobLevel = Math.max(1, mob.getPersistentDataContainer().getOrDefault(monsterLevelKey, PersistentDataType.INTEGER, 1));
+        double rare = Math.min(0.08, plugin.getConfig().getDouble("adventure-loot.mob-loot.rare-extra-chance", 0.025) + (mobLevel - 1) * 0.0003);
+        double common = Math.min(0.30, plugin.getConfig().getDouble("adventure-loot.mob-loot.common-extra-chance", 0.12) + (mobLevel - 1) * 0.001);
         if (random.nextDouble() < common) {
             Material[] commonLoot = {Material.IRON_INGOT, Material.GOLD_NUGGET, Material.COPPER_INGOT,
                     Material.LAPIS_LAZULI, Material.STRING, Material.LEATHER, Material.BREAD};
@@ -68,12 +71,13 @@ public final class AdventureLootManager implements Listener {
                     Material.IRON_BLOCK, Material.OBSIDIAN, Material.EXPERIENCE_BOTTLE};
             event.getDrops().add(new ItemStack(rareLoot[random.nextInt(rareLoot.length)], 1));
         }
-        double coinChance = plugin.getConfig().getDouble("adventure-loot.mob-loot.coin-drop-chance", 0.15);
+        double coinChance = Math.min(0.30, plugin.getConfig().getDouble("adventure-loot.mob-loot.coin-drop-chance", 0.15) + (mobLevel - 1) * 0.001);
         if (random.nextDouble() < coinChance) {
             ItemStack coin = rollCoinReward("adventure-loot.mob-loot");
             if (coin != null) event.getDrops().add(coin);
         }
-        if (random.nextDouble() < plugin.getConfig().getDouble("adventure-loot.mob-loot.extreme-rare-chance", 0.001)) {
+        double extremeChance = Math.min(0.002, plugin.getConfig().getDouble("adventure-loot.mob-loot.extreme-rare-chance", 0.001) + (mobLevel - 1) * 0.00001);
+        if (random.nextDouble() < extremeChance) {
             Material[] extreme = {Material.ENCHANTED_BOOK, Material.DIAMOND, Material.NETHERITE_SCRAP,
                     Material.GOLD_BLOCK, Material.DIAMOND_BLOCK};
             event.getDrops().add(new ItemStack(extreme[random.nextInt(extreme.length)], 1));
