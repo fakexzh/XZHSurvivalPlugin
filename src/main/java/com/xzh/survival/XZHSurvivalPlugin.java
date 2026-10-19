@@ -3,8 +3,10 @@ package com.xzh.survival;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.Particle;
 import org.bukkit.Tag;
 import org.bukkit.World;
+import org.bukkit.GameMode;
 import org.bukkit.block.Block;
 import org.bukkit.block.data.type.Leaves;
 import org.bukkit.entity.Item;
@@ -36,6 +38,7 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
     private final Random random = new Random();
     private final Map<UUID, Integer> pendingXpRestore = new HashMap<>();
     private CustomTimeManager customTimeManager;
+    private SurvivalFeatures survivalFeatures;
 
     @Override
     public void onEnable() {
@@ -43,11 +46,14 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         getServer().getPluginManager().registerEvents(this, this);
         customTimeManager = new CustomTimeManager(this);
         customTimeManager.start();
+        survivalFeatures = new SurvivalFeatures(this);
+        survivalFeatures.start();
         getLogger().info("XZH Survival Plugin enabled.");
     }
 
     @Override
     public void onDisable() {
+        if (survivalFeatures != null) survivalFeatures.shutdown();
         if (customTimeManager != null) customTimeManager.shutdown();
     }
 
@@ -70,6 +76,18 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         if (logs.size() < 2 || leaves.size() <
                 getConfig().getInt("tree-felling.minimum-leaves", 6)) return;
 
+        // Tree felling is atomic: do not harvest an entire tree if the axe would
+        // break before every log can consume its required durability point.
+        if (player.getGameMode() != GameMode.CREATIVE
+                && tool.getItemMeta() instanceof Damageable damageable) {
+            int remainingDurability = tool.getType().getMaxDurability() - damageable.getDamage();
+            if (remainingDurability < logs.size()) {
+                player.sendMessage("§cYour axe needs at least " + logs.size()
+                        + " durability points to fell this tree. This log will break normally.");
+                return;
+            }
+        }
+
         Map<Material, Integer> totals = new HashMap<>();
         for (Block log : logs) totals.merge(log.getType(), 1, Integer::sum);
         if (!hasInventorySpace(player.getInventory(), totals)) {
@@ -91,7 +109,7 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
                 while (index < leaves.size() && removedThisTick < 2) {
                     Block leaf = leaves.get(index++);
                     if (leaf.getBlockData() instanceof Leaves) {
-                        leaf.getWorld().spawnParticle(org.bukkit.Particle.BLOCK, leaf.getLocation().add(0.5, 0.5, 0.5),
+                        leaf.getWorld().spawnParticle(Particle.BLOCK, leaf.getLocation().add(0.5, 0.5, 0.5),
                                 3, 0.2, 0.2, 0.2, leaf.getBlockData());
                         leaf.setType(Material.AIR, false);
                     }
@@ -108,7 +126,7 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
                 amount -= stack;
             }
         }
-        damageTool(tool);
+        if (player.getGameMode() != GameMode.CREATIVE) damageTool(tool, logs.size());
         player.sendMessage("§aTree felled! §fLogs collected directly into your inventory.");
     }
 
@@ -199,15 +217,16 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         return true;
     }
 
-    private void damageTool(ItemStack tool) {
-        if (tool.getItemMeta() instanceof Damageable damageable) {
+    private void damageTool(ItemStack tool, int points) {
+        for (int i = 0; i < points; i++) {
+            if (!(tool.getItemMeta() instanceof Damageable damageable)) return;
             int nextDamage = damageable.getDamage() + 1;
             if (nextDamage >= tool.getType().getMaxDurability()) {
                 tool.setAmount(0);
-            } else {
-                damageable.setDamage(nextDamage);
-                tool.setItemMeta(damageable);
+                return;
             }
+            damageable.setDamage(nextDamage);
+            tool.setItemMeta(damageable);
         }
     }
 

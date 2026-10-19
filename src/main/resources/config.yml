@@ -29,3 +29,25 @@ custom-time:
   enabled: false
   day-duration-seconds: 1800
   night-duration-seconds: 1800
+
+# Individual progression is based on each player's accumulated online time.
+progression:
+  enabled: true
+  level-2-hours: 2
+  level-3-hours: 5
+  level-4-hours: 10
+  level-5-hours: 20
+  player-detection-radius: 96
+  equipment-chance-per-level: 0.09
+  health-bonus-per-level: 0.05
+  max-health-bonus: 0.10
+
+tab:
+  enabled: true
+
+combat:
+  target-range: 6
+  damage-indicators:
+    enabled: true
+  target-health:
+    enabled: true

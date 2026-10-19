@@ -2,7 +2,7 @@ name: Build XZH Survival Plugin
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, 'feature/**']
   workflow_dispatch:
 
 permissions:

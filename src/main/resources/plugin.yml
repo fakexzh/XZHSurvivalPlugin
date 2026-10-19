@@ -3,10 +3,10 @@ version: 1.0.0
 main: com.xzh.survival.XZHSurvivalPlugin
 api-version: '26.3'
 softdepend: [XZHEconomySystem]
-description: Survival quality-of-life and dimension death rules for XZH servers
+description: Survival quality-of-life, player progression, combat indicators, and dimension death rules for XZH servers
 permissions:
   xzhsurvival.admin:
-    description: Bypass tree-felling restrictions
+    description: Bypass tree-felling restrictions and configure custom time
     default: op
 
 commands:
