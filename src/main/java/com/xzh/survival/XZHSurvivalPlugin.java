@@ -43,7 +43,6 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
     public void onBlockBreak(BlockBreakEvent event) {
         if (!getConfig().getBoolean("tree-felling.enabled", true)) return;
         Player player = event.getPlayer();
-        if (player.hasPermission("xzhsurvival.admin")) return;
         if (getConfig().getBoolean("tree-felling.require-sneak-to-disable", true) && player.isSneaking()) return;
 
         ItemStack tool = player.getInventory().getItemInMainHand();
