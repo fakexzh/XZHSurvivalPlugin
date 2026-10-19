@@ -58,7 +58,9 @@ public final class DynamicTradingManager implements Listener {
         List<MerchantRecipe> base = baseRecipes.computeIfAbsent(id, ignored -> {
             List<MerchantRecipe> copy = new ArrayList<>();
             for (MerchantRecipe recipe : merchant.getRecipes()) {
-                ItemMeta meta = recipe.getResult().getItemMeta();
+                ItemStack result = recipe.getResult();
+                ItemMeta meta = result.getItemMeta();
+                if (entity instanceof Villager && result.getType() == Material.ENCHANTED_BOOK) continue;
                 if (meta == null || !meta.getPersistentDataContainer().has(specialKey, PersistentDataType.BYTE)) copy.add(recipe);
             }
             return copy;
