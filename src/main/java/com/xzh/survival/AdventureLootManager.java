@@ -18,6 +18,8 @@ import org.bukkit.event.player.PlayerAttemptPickupItemEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.plugin.Plugin;
+import java.lang.reflect.Method;
 
 import java.util.*;
 
@@ -55,6 +57,11 @@ public final class AdventureLootManager implements Listener {
                     Material.IRON_BLOCK, Material.OBSIDIAN, Material.EXPERIENCE_BOTTLE};
             event.getDrops().add(new ItemStack(rareLoot[random.nextInt(rareLoot.length)], 1));
         }
+        double coinChance = plugin.getConfig().getDouble("adventure-loot.mob-loot.coin-drop-chance", 0.15);
+        if (random.nextDouble() < coinChance) {
+            ItemStack coin = createOfficialCoin(1 + random.nextInt(1), 1);
+            if (coin != null) event.getDrops().add(coin);
+        }
         if (random.nextDouble() < plugin.getConfig().getDouble("adventure-loot.mob-loot.extreme-rare-chance", 0.001)) {
             Material[] extreme = {Material.ENCHANTED_BOOK, Material.DIAMOND, Material.NETHERITE_SCRAP,
                     Material.GOLD_BLOCK, Material.DIAMOND_BLOCK};
@@ -67,6 +74,14 @@ public final class AdventureLootManager implements Listener {
         if (event.getState() != PlayerFishEvent.State.CAUGHT_FISH
                 || !plugin.getConfig().getBoolean("adventure-loot.fishing.enabled", true)) return;
         if (!(event.getCaught() instanceof Item caught)) return;
+        double coinChance = plugin.getConfig().getDouble("adventure-loot.fishing.coin-chance", 0.06);
+        if (random.nextDouble() < coinChance) {
+            ItemStack coin = createOfficialCoin(1, 1);
+            if (coin != null) {
+                event.getPlayer().getWorld().dropItemNaturally(caught.getLocation(), coin);
+                event.getPlayer().sendMessage("§6[XZH] §aA coin was caught while fishing!");
+            }
+        }
         double bonusChance = plugin.getConfig().getDouble("adventure-loot.fishing.bonus-reward-chance", 0.20);
         if (random.nextDouble() >= bonusChance) return;
         Material reward;
@@ -114,6 +129,20 @@ public final class AdventureLootManager implements Listener {
         if (!plugin.getConfig().getBoolean("adventure-loot.enabled", true)
                 || random.nextDouble() >= plugin.getConfig().getDouble("adventure-loot.exploration.piglin-barter-coin-chance", 0.04)) return;
         event.getOutcome().add(new ItemStack(Material.GOLD_NUGGET, 1 + random.nextInt(3)));
+    }
+
+    private ItemStack createOfficialCoin(int denomination, int amount) {
+        Plugin economy = Bukkit.getPluginManager().getPlugin("XZHEconomySystem");
+        if (economy == null || !economy.isEnabled()) return null;
+        try {
+            Object manager = economy.getClass().getMethod("getPocketCoinManager").invoke(economy);
+            Method create = manager.getClass().getDeclaredMethod("createCoin", int.class, int.class);
+            create.setAccessible(true);
+            return (ItemStack) create.invoke(manager, denomination, amount);
+        } catch (ReflectiveOperationException | RuntimeException ex) {
+            plugin.getLogger().warning("Could not create official XZH coin loot: " + ex.getClass().getSimpleName());
+            return null;
+        }
     }
 
     private void markMobLoot(Item item) {
