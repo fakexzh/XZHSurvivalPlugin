@@ -54,15 +54,6 @@ public final class AdventureLootManager implements Listener {
                 || !plugin.getConfig().getBoolean("adventure-loot.mob-loot.enabled", true)) return;
         LivingEntity mob = event.getEntity();
         if (mob.getKiller() == null) return;
-        // Tag nearby drops one tick later using a captured location; the dead mob entity may already be invalid.
-        org.bukkit.Location deathLocation = mob.getLocation().clone();
-        org.bukkit.World deathWorld = mob.getWorld();
-        Bukkit.getScheduler().runTask(plugin, () -> {
-            if (!deathWorld.isChunkLoaded(deathLocation.getBlockX() >> 4, deathLocation.getBlockZ() >> 4)) return;
-            for (Entity nearby : deathWorld.getNearbyEntities(deathLocation, 4.0, 4.0, 4.0)) {
-                if (nearby instanceof Item dropped && !isXzhCoin(dropped.getItemStack())) markMobLoot(dropped);
-            }
-        });
         int mobLevel = Math.max(1, mob.getPersistentDataContainer().getOrDefault(monsterLevelKey, PersistentDataType.INTEGER, 1));
         double rare = Math.min(0.08, plugin.getConfig().getDouble("adventure-loot.mob-loot.rare-extra-chance", 0.025) + (mobLevel - 1) * 0.0003);
         double common = Math.min(0.30, plugin.getConfig().getDouble("adventure-loot.mob-loot.common-extra-chance", 0.12) + (mobLevel - 1) * 0.001);
@@ -88,6 +79,20 @@ public final class AdventureLootManager implements Listener {
                     Material.GOLD_BLOCK, Material.DIAMOND_BLOCK};
             event.getDrops().add(createLootItem(extreme[random.nextInt(extreme.length)]));
         }
+        // Tag only entities matching this mob's actual drop list, avoiding unrelated nearby items.
+        org.bukkit.Location deathLocation = mob.getLocation().clone();
+        org.bukkit.World deathWorld = mob.getWorld();
+        List<ItemStack> expectedDrops = event.getDrops().stream().map(ItemStack::clone)
+                .filter(stack -> !stack.getType().isAir() && !isXzhCoin(stack)).toList();
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            if (!deathWorld.isChunkLoaded(deathLocation.getBlockX() >> 4, deathLocation.getBlockZ() >> 4)) return;
+            for (Entity nearby : deathWorld.getNearbyEntities(deathLocation, 3.0, 3.0, 3.0)) {
+                if (!(nearby instanceof Item dropped) || isXzhCoin(dropped.getItemStack())
+                        || dropped.getLocation().distanceSquared(deathLocation) > 9.0) continue;
+                ItemStack actual = dropped.getItemStack();
+                if (expectedDrops.stream().anyMatch(expected -> expected.isSimilar(actual))) markMobLoot(dropped);
+            }
+        });
     }
 
     @EventHandler(ignoreCancelled = true)
