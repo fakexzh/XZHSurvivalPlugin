@@ -62,6 +62,8 @@ adventure-loot:
     rare-reward-chance: 0.035
     extreme-rare-chance: 0.001
     coin-chance: 0.06
+    quest-enabled: true
+    quest-catches: 10
   exploration:
     village-chest-rewards-enabled: true
     village-chest-coin-chance: 0.12
