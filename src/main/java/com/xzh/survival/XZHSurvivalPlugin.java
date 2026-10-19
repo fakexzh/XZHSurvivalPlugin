@@ -12,7 +12,6 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
-import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.inventory.meta.Damageable;
@@ -22,17 +21,14 @@ import org.bukkit.plugin.java.JavaPlugin;
 import java.lang.reflect.Method;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 
 public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
     private final Random random = new Random();
-    private final Map<UUID, Integer> pendingXpLoss = new HashMap<>();
 
     @Override
     public void onEnable() {
@@ -49,14 +45,8 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         if (getConfig().getBoolean("tree-felling.require-sneak-to-disable", true) && player.isSneaking()) return;
 
         ItemStack tool = player.getInventory().getItemInMainHand();
-        Material required = Material.matchMaterial(getConfig().getString("tree-felling.minimum-axe", "IRON") + "_AXE");
-        if (required == null) required = Material.IRON_AXE;
-        String axe = tool.getType().name();
-        if (required == Material.IRON_AXE) {
-            if (!axe.equals("IRON_AXE") && !axe.equals("DIAMOND_AXE") && !axe.equals("NETHERITE_AXE")) return;
-        } else if (!axe.endsWith("_AXE")) {
-            return;
-        }
+        // All vanilla axe tiers can fell trees.
+        if (!tool.getType().name().endsWith("_AXE")) return;
 
         Block start = event.getBlock();
         if (!Tag.LOGS.isTagged(start.getType())) return;
@@ -73,12 +63,12 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
             return;
         }
 
+        // Take over the break so vanilla cannot re-break the first log or duplicate drops.
         event.setDropItems(false);
+        event.setCancelled(true);
         for (Block log : logs) {
-            if (log.equals(start)) continue;
             log.setType(Material.AIR, false);
         }
-        start.setType(Material.AIR, false);
         for (Map.Entry<Material, Integer> entry : totals.entrySet()) {
             int amount = entry.getValue();
             while (amount > 0) {
@@ -173,14 +163,18 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         if (keep) {
             event.setKeepInventory(true);
             event.getDrops().clear();
+        } else {
+            // Explicitly preserve normal Overworld item-drop behavior.
+            event.setKeepInventory(false);
         }
 
-        int totalXp = Math.max(0, player.getTotalExperience());
+        // Preserve vanilla XP drops, reducing them by the configured percentage.
+        // Setting dropped XP to zero caused all XP to disappear instead of dropping.
         int min = getConfig().getInt("death.xp-loss-min-percent", 25);
         int max = getConfig().getInt("death.xp-loss-max-percent", 50);
         int percent = min + random.nextInt(Math.max(1, max - min + 1));
-        pendingXpLoss.put(player.getUniqueId(), Math.round(totalXp * percent / 100.0f));
-        event.setDroppedExp(0);
+        int vanillaDroppedXp = Math.max(0, event.getDroppedExp());
+        event.setDroppedExp(Math.max(0, Math.round(vanillaDroppedXp * (100 - percent) / 100.0f)));
 
         int penalty;
         if (dimension.equals("overworld")) {
@@ -192,14 +186,6 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         }
         deductBank(player, penalty);
         player.sendMessage("§cDeath penalty: §f" + penalty + " coins from your bank. §7XP loss: " + percent + "%.");
-    }
-
-    @EventHandler
-    public void onRespawn(PlayerRespawnEvent event) {
-        UUID id = event.getPlayer().getUniqueId();
-        Integer loss = pendingXpLoss.remove(id);
-        if (loss == null || loss <= 0) return;
-        Bukkit.getScheduler().runTask(this, () -> event.getPlayer().giveExp(-loss));
     }
 
     private int overworldPenalty(Player player) {
