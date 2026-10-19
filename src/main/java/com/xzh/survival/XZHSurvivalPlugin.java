@@ -15,6 +15,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
+import org.bukkit.enchantments.Enchantment;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.inventory.meta.Damageable;
@@ -36,6 +37,7 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
     private final Random random = new Random();
     private final Map<UUID, Integer> pendingXpRestore = new HashMap<>();
     private CustomTimeManager customTimeManager;
+    private SurvivalFeatureManager survivalFeatureManager;
 
     @Override
     public void onEnable() {
@@ -43,12 +45,15 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         getServer().getPluginManager().registerEvents(this, this);
         customTimeManager = new CustomTimeManager(this);
         customTimeManager.start();
+        survivalFeatureManager = new SurvivalFeatureManager(this);
+        survivalFeatureManager.start();
         getLogger().info("XZH Survival Plugin enabled.");
     }
 
     @Override
     public void onDisable() {
         if (customTimeManager != null) customTimeManager.shutdown();
+        if (survivalFeatureManager != null) survivalFeatureManager.shutdown();
     }
 
     @EventHandler(ignoreCancelled = true)
@@ -66,13 +71,13 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
 
         List<Block> logs = collectConnectedLogs(start,
                 getConfig().getInt("tree-felling.maximum-logs", 256));
-        List<Block> leaves = collectNearbyLeaves(logs);
-        if (logs.size() < 2 || leaves.size() <
+        List<Block> nearbyLeaves = collectNearbyLeaves(logs);
+        if (logs.size() < 2 || nearbyLeaves.size() <
                 getConfig().getInt("tree-felling.minimum-leaves", 6)) return;
 
-        Map<Material, Integer> totals = new HashMap<>();
-        for (Block log : logs) totals.merge(log.getType(), 1, Integer::sum);
-        if (!hasInventorySpace(player.getInventory(), totals)) {
+        Map<Material, Integer> requiredTotals = new HashMap<>();
+        for (Block log : logs) requiredTotals.merge(log.getType(), 1, Integer::sum);
+        if (!hasInventorySpace(player.getInventory(), requiredTotals)) {
             player.sendMessage("§cYour inventory needs more space to fell this tree.");
             return;
         }
@@ -80,10 +85,21 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         // Take over the break so vanilla cannot re-break the first log or duplicate drops.
         event.setDropItems(false);
         event.setCancelled(true);
-        playWoodFlyAnimation(player, logs);
+
+        // Every harvested log costs one durability point (subject to normal Unbreaking).
+        // If the axe breaks, logs beyond that point remain in the world and are not collected.
+        List<Block> felledLogs = new ArrayList<>();
         for (Block log : logs) {
+            if (tool.getType().isAir() || tool.getAmount() <= 0) break;
             log.setType(Material.AIR, false);
+            felledLogs.add(log);
+            damageTool(tool);
+            if (tool.getType().isAir() || tool.getAmount() <= 0) break;
         }
+        if (felledLogs.isEmpty()) return;
+
+        List<Block> leaves = collectNearbyLeaves(felledLogs);
+        playWoodFlyAnimation(player, felledLogs);
         new BukkitRunnable() {
             private int index = 0;
             @Override public void run() {
@@ -100,6 +116,9 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
                 if (index >= leaves.size()) cancel();
             }
         }.runTaskTimer(this, 1L, 1L);
+
+        Map<Material, Integer> totals = new HashMap<>();
+        for (Block log : felledLogs) totals.merge(log.getType(), 1, Integer::sum);
         for (Map.Entry<Material, Integer> entry : totals.entrySet()) {
             int amount = entry.getValue();
             while (amount > 0) {
@@ -108,8 +127,7 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
                 amount -= stack;
             }
         }
-        damageTool(tool);
-        player.sendMessage("§aTree felled! §fLogs collected directly into your inventory.");
+        player.sendMessage("§aTree felled! §f" + felledLogs.size() + " logs collected directly into your inventory.");
     }
 
     private List<Block> collectConnectedLogs(Block start, int maximum) {
@@ -200,6 +218,10 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
     }
 
     private void damageTool(ItemStack tool) {
+        if (tool == null || tool.getType().isAir() || tool.getAmount() <= 0) return;
+        int unbreaking = tool.getEnchantmentLevel(Enchantment.UNBREAKING);
+        if (unbreaking > 0 && random.nextInt(unbreaking + 1) != 0) return;
+
         if (tool.getItemMeta() instanceof Damageable damageable) {
             int nextDamage = damageable.getDamage() + 1;
             if (nextDamage >= tool.getType().getMaxDurability()) {
