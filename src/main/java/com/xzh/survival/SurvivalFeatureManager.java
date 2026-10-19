@@ -159,7 +159,7 @@ public final class SurvivalFeatureManager implements Listener {
         player.setPlayerListName(player.getName() + " §e" + Math.max(0, player.getPing()) + "ms");
         player.setPlayerListHeaderFooter(
                 "§d§lNETWORK §f• §d" + online + " ONLINE",
-                "§dMONSTER LEVEL §f" + level + " §8| §7Your playtime: §f" + formatPlaytime(
+                "§dMONSTER LEVEL §d" + level + " §8| §7Your playtime: §f" + formatPlaytime(
                         playtimeSeconds.getOrDefault(player.getUniqueId(), 0L)));
     }
 
