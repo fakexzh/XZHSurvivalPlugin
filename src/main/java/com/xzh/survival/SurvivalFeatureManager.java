@@ -201,9 +201,11 @@ public final class SurvivalFeatureManager implements Listener {
     private void tryMonsterBuilding() {
         if (!plugin.getConfig().getBoolean("mob-progression.enabled", true)
                 || !plugin.getConfig().getBoolean("mob-progression.special-block-building-enabled", true)) return;
-        for (World world : Bukkit.getWorlds()) {
-            for (Entity entity : world.getEntities()) {
-                if (!(entity instanceof Monster monster) || monster.isDead()) continue;
+        java.util.Set<UUID> checked = new java.util.HashSet<>();
+        for (Player nearbyPlayer : Bukkit.getOnlinePlayers()) {
+            for (Entity entity : nearbyPlayer.getNearbyEntities(16.0, 16.0, 16.0)) {
+                if (!(entity instanceof Monster monster) || monster.isDead()
+                        || !checked.add(monster.getUniqueId())) continue;
                 int level = monster.getPersistentDataContainer().getOrDefault(monsterLevelKey, PersistentDataType.INTEGER, 1);
                 int startLevel = Math.max(1, plugin.getConfig().getInt("mob-progression.special-abilities-start-level", 20));
                 if (level < startLevel || monster.getPersistentDataContainer().has(builtStepKey, PersistentDataType.BYTE)) continue;
