@@ -2,6 +2,8 @@ package com.xzh.survival;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
+import org.bukkit.enchantments.Enchantment;
+import org.bukkit.inventory.meta.EnchantmentStorageMeta;
 import org.bukkit.block.Chest;
 import org.bukkit.block.BlockState;
 import org.bukkit.NamespacedKey;
@@ -80,7 +82,7 @@ public final class AdventureLootManager implements Listener {
         if (random.nextDouble() < extremeChance) {
             Material[] extreme = {Material.ENCHANTED_BOOK, Material.DIAMOND, Material.NETHERITE_SCRAP,
                     Material.GOLD_BLOCK, Material.DIAMOND_BLOCK};
-            event.getDrops().add(new ItemStack(extreme[random.nextInt(extreme.length)], 1));
+            event.getDrops().add(createLootItem(extreme[random.nextInt(extreme.length)]));
         }
     }
 
@@ -110,7 +112,7 @@ public final class AdventureLootManager implements Listener {
                     Material.LEATHER, Material.BONE, Material.BOOK, Material.COPPER_INGOT};
             reward = ordinary[random.nextInt(ordinary.length)];
         }
-        Item extra = event.getPlayer().getWorld().dropItemNaturally(caught.getLocation(), new ItemStack(reward));
+        Item extra = event.getPlayer().getWorld().dropItemNaturally(caught.getLocation(), createLootItem(reward));
         markMobLoot(extra);
     }
 
@@ -166,6 +168,20 @@ public final class AdventureLootManager implements Listener {
                 || random.nextDouble() >= plugin.getConfig().getDouble("adventure-loot.exploration.piglin-barter-coin-chance", 0.04)) return;
         ItemStack coin = rollCoinReward("adventure-loot.mob-loot");
         if (coin != null) event.getOutcome().add(coin);
+    }
+
+    private ItemStack createLootItem(Material material) {
+        ItemStack item = new ItemStack(material);
+        if (material == Material.ENCHANTED_BOOK && item.getItemMeta() instanceof EnchantmentStorageMeta book) {
+            Enchantment[] choices = {Enchantment.MENDING, Enchantment.UNBREAKING, Enchantment.EFFICIENCY,
+                    Enchantment.FORTUNE, Enchantment.SILK_TOUCH, Enchantment.PROTECTION, Enchantment.SHARPNESS,
+                    Enchantment.LOOTING, Enchantment.POWER, Enchantment.FEATHER_FALLING};
+            Enchantment enchantment = choices[random.nextInt(choices.length)];
+            int level = 1 + random.nextInt(Math.max(1, enchantment.getMaxLevel()));
+            book.addStoredEnchant(enchantment, level, true);
+            item.setItemMeta(book);
+        }
+        return item;
     }
 
     private ItemStack rollCoinReward(String path) {
