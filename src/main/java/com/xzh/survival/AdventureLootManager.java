@@ -35,6 +35,7 @@ public final class AdventureLootManager implements Listener {
     private final NamespacedKey monsterLevelKey;
     private final NamespacedKey fishingQuestProgressKey;
     private final NamespacedKey pickupAnnouncedKey;
+    private final NamespacedKey lootSourceKey;
 
     public AdventureLootManager(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -43,6 +44,7 @@ public final class AdventureLootManager implements Listener {
         monsterLevelKey = new NamespacedKey(plugin, "monster_level");
         fishingQuestProgressKey = new NamespacedKey(plugin, "fishing_quest_progress");
         pickupAnnouncedKey = new NamespacedKey(plugin, "loot_pickup_announced");
+        lootSourceKey = new NamespacedKey(plugin, "loot_source");
     }
 
     public void start() {
@@ -84,14 +86,17 @@ public final class AdventureLootManager implements Listener {
         org.bukkit.Location deathLocation = mob.getLocation().clone();
         org.bukkit.World deathWorld = mob.getWorld();
         List<ItemStack> expectedDrops = event.getDrops().stream().map(ItemStack::clone)
-                .filter(stack -> !stack.getType().isAir() && !isXzhCoin(stack)).toList();
+                .filter(stack -> !stack.getType().isAir()).toList();
         Bukkit.getScheduler().runTask(plugin, () -> {
             if (!deathWorld.isChunkLoaded(deathLocation.getBlockX() >> 4, deathLocation.getBlockZ() >> 4)) return;
             for (Entity nearby : deathWorld.getNearbyEntities(deathLocation, 3.0, 3.0, 3.0)) {
-                if (!(nearby instanceof Item dropped) || isXzhCoin(dropped.getItemStack())
+                if (!(nearby instanceof Item dropped)
                         || dropped.getLocation().distanceSquared(deathLocation) > 9.0) continue;
                 ItemStack actual = dropped.getItemStack();
-                if (expectedDrops.stream().anyMatch(expected -> expected.isSimilar(actual))) markMobLoot(dropped);
+                if (expectedDrops.stream().anyMatch(expected -> expected.isSimilar(actual))) {
+                    if (isXzhCoin(actual)) markLootSource(dropped, "mob");
+                    else markMobLoot(dropped);
+                }
             }
         });
     }
@@ -102,10 +107,15 @@ public final class AdventureLootManager implements Listener {
                 || !plugin.getConfig().getBoolean("adventure-loot.fishing.enabled", true)) return;
         if (!(event.getCaught() instanceof Item caught)) return;
         progressFishingQuest(event.getPlayer(), caught.getLocation());
+        event.getPlayer().sendMessage("§b§l🎣 FISHING §8» §fCaught §e" + caught.getItemStack().getAmount()
+                + "x §f" + prettyName(caught.getItemStack().getType()) + "§b!");
         double coinChance = plugin.getConfig().getDouble("adventure-loot.fishing.coin-chance", 0.06);
         if (random.nextDouble() < coinChance) {
             ItemStack coin = rollCoinReward("adventure-loot.mob-loot");
-            if (coin != null) event.getPlayer().getWorld().dropItemNaturally(caught.getLocation(), coin);
+            if (coin != null) {
+                Item coinDrop = event.getPlayer().getWorld().dropItemNaturally(caught.getLocation(), coin);
+                markLootSource(coinDrop, "fishing");
+            }
         }
         double bonusChance = plugin.getConfig().getDouble("adventure-loot.fishing.bonus-reward-chance", 0.20);
         if (random.nextDouble() >= bonusChance) return;
@@ -138,6 +148,8 @@ public final class AdventureLootManager implements Listener {
         }
         Item extra = event.getPlayer().getWorld().dropItemNaturally(caught.getLocation(), createLootItem(reward));
         markMobLoot(extra);
+        event.getPlayer().sendMessage("§d§l✦ FISHING BONUS §8» §fBonus item: §e" + prettyName(reward)
+                + " §7(dropped nearby)");
     }
 
     @EventHandler(ignoreCancelled = true)
@@ -146,17 +158,15 @@ public final class AdventureLootManager implements Listener {
         ItemStack stack = item.getItemStack();
         if (isXzhCoin(stack)) {
             int denomination = getCoinDenomination(stack);
-            event.getPlayer().sendMessage("§6[XZH] §a+" + stack.getAmount() + " × " + denomination + " XZH Coin"
-                    + (stack.getAmount() == 1 ? "" : "s") + " §7(+" + ((long) denomination * stack.getAmount()) + " total)");
+            String source = item.getPersistentDataContainer().getOrDefault(lootSourceKey, PersistentDataType.STRING, "mob");
+            String sourceLabel = source.equals("fishing") ? "§b(Fishing)" : "§7(Mob drop)";
+            event.getPlayer().sendMessage("§6§l✦ XZH COINS §8» §e" + stack.getAmount() + " × "
+                    + denomination + " coin" + (stack.getAmount() == 1 ? "" : "s")
+                    + " §acollected §8" + sourceLabel
+                    + " §7(§6+" + String.format(Locale.US, "%,d", (long) denomination * stack.getAmount()) + " total§7)");
             return;
         }
-        if (plugin.getConfig().getBoolean("adventure-loot.mob-loot.first-pickup-announcements", true)
-                && plugin.getConfig().getBoolean("adventure-loot.pickup-messages.mob-loot-first-pickup-only", true)
-                && item.getPersistentDataContainer().has(mobLootKey, PersistentDataType.BYTE)
-                && !item.getPersistentDataContainer().has(pickupAnnouncedKey, PersistentDataType.BYTE)) {
-            item.getPersistentDataContainer().set(pickupAnnouncedKey, PersistentDataType.BYTE, (byte) 1);
-            event.getPlayer().sendMessage("§a[Loot] §f+" + stack.getAmount() + " " + prettyName(stack.getType()));
-        }
+        // Regular mob loot is intentionally silent. Fishing catches and bonus items are announced at catch time.
     }
 
     @EventHandler(ignoreCancelled = true)
@@ -263,6 +273,10 @@ public final class AdventureLootManager implements Listener {
 
     private void markMobLoot(Item item) {
         item.getPersistentDataContainer().set(mobLootKey, PersistentDataType.BYTE, (byte) 1);
+    }
+
+    private void markLootSource(Item item, String source) {
+        item.getPersistentDataContainer().set(lootSourceKey, PersistentDataType.STRING, source);
     }
 
     private boolean isXzhCoin(ItemStack stack) {
