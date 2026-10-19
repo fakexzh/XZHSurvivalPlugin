@@ -33,6 +33,7 @@ public final class AdventureLootManager implements Listener {
     private final NamespacedKey mobLootKey;
     private final NamespacedKey villageChestCheckedKey;
     private final NamespacedKey monsterLevelKey;
+    private final NamespacedKey fishingQuestProgressKey;
     private final Set<UUID> announcedMobDrops = new HashSet<>();
 
     public AdventureLootManager(JavaPlugin plugin) {
@@ -40,6 +41,7 @@ public final class AdventureLootManager implements Listener {
         mobLootKey = new NamespacedKey(plugin, "mob_loot_pickup");
         villageChestCheckedKey = new NamespacedKey(plugin, "village_coin_checked");
         monsterLevelKey = new NamespacedKey(plugin, "monster_level");
+        fishingQuestProgressKey = new NamespacedKey(plugin, "fishing_quest_progress");
     }
 
     public void start() {
@@ -91,6 +93,7 @@ public final class AdventureLootManager implements Listener {
         if (event.getState() != PlayerFishEvent.State.CAUGHT_FISH
                 || !plugin.getConfig().getBoolean("adventure-loot.fishing.enabled", true)) return;
         if (!(event.getCaught() instanceof Item caught)) return;
+        progressFishingQuest(event.getPlayer(), caught.getLocation());
         double coinChance = plugin.getConfig().getDouble("adventure-loot.fishing.coin-chance", 0.06);
         if (random.nextDouble() < coinChance) {
             ItemStack coin = rollCoinReward("adventure-loot.mob-loot");
@@ -168,6 +171,21 @@ public final class AdventureLootManager implements Listener {
                 || random.nextDouble() >= plugin.getConfig().getDouble("adventure-loot.exploration.piglin-barter-coin-chance", 0.04)) return;
         ItemStack coin = rollCoinReward("adventure-loot.mob-loot");
         if (coin != null) event.getOutcome().add(coin);
+    }
+
+    private void progressFishingQuest(Player player, org.bukkit.Location location) {
+        if (!plugin.getConfig().getBoolean("adventure-loot.fishing.quest-enabled", true)) return;
+        int goal = Math.max(1, plugin.getConfig().getInt("adventure-loot.fishing.quest-catches", 10));
+        int progress = player.getPersistentDataContainer().getOrDefault(fishingQuestProgressKey, PersistentDataType.INTEGER, 0) + 1;
+        if (progress >= goal) {
+            player.getPersistentDataContainer().set(fishingQuestProgressKey, PersistentDataType.INTEGER, 0);
+            ItemStack reward = rollCoinReward("adventure-loot.mob-loot");
+            if (reward != null) player.getWorld().dropItemNaturally(location, reward);
+            player.sendMessage("§b[Fishing Quest] §aComplete! You caught " + goal + " fish. A coin reward is waiting nearby.");
+        } else {
+            player.getPersistentDataContainer().set(fishingQuestProgressKey, PersistentDataType.INTEGER, progress);
+            if (progress % 5 == 0) player.sendMessage("§b[Fishing Quest] §fProgress: " + progress + "/" + goal + " catches.");
+        }
     }
 
     private ItemStack createLootItem(Material material) {
