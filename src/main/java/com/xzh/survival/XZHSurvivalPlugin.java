@@ -35,12 +35,20 @@ import java.util.UUID;
 public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
     private final Random random = new Random();
     private final Map<UUID, Integer> pendingXpRestore = new HashMap<>();
+    private CustomTimeManager customTimeManager;
 
     @Override
     public void onEnable() {
         saveDefaultConfig();
         getServer().getPluginManager().registerEvents(this, this);
+        customTimeManager = new CustomTimeManager(this);
+        customTimeManager.start();
         getLogger().info("XZH Survival Plugin enabled.");
+    }
+
+    @Override
+    public void onDisable() {
+        if (customTimeManager != null) customTimeManager.shutdown();
     }
 
     @EventHandler(ignoreCancelled = true)
