@@ -158,12 +158,11 @@ public final class AdventureLootManager implements Listener {
         ItemStack stack = item.getItemStack();
         if (isXzhCoin(stack)) {
             int denomination = getCoinDenomination(stack);
-            String source = item.getPersistentDataContainer().getOrDefault(lootSourceKey, PersistentDataType.STRING, "mob");
-            String sourceLabel = source.equals("fishing") ? "§b(Fishing)" : "§7(Mob drop)";
-            event.getPlayer().sendMessage("§6§l✦ XZH COINS §8» §e" + stack.getAmount() + " × "
-                    + denomination + " coin" + (stack.getAmount() == 1 ? "" : "s")
-                    + " §acollected §8" + sourceLabel
-                    + " §7(§6+" + String.format(Locale.US, "%,d", (long) denomination * stack.getAmount()) + " total§7)");
+            long collectedValue = (long) denomination * stack.getAmount();
+            long totalCoins = getInventoryCoinTotal(event.getPlayer()) + collectedValue;
+            event.getPlayer().sendMessage("§f" + stack.getAmount() + "x §e"
+                    + String.format(Locale.US, "%,d", collectedValue) + " coins collected §8| §7("
+                    + String.format(Locale.US, "%,d", totalCoins) + " coins total§7)");
             return;
         }
         // Regular mob loot is intentionally silent. Fishing catches and bonus items are announced at catch time.
@@ -287,6 +286,16 @@ public final class AdventureLootManager implements Listener {
         var pdc = stack.getItemMeta().getPersistentDataContainer();
         return pdc.getKeys().stream().anyMatch(key -> key.getNamespace().equals("xzheconomysystem")
                 && key.getKey().equals("coin_denomination"));
+    }
+
+    private long getInventoryCoinTotal(Player player) {
+        long total = 0L;
+        for (ItemStack inventoryItem : player.getInventory().getContents()) {
+            if (isXzhCoin(inventoryItem)) {
+                total += (long) getCoinDenomination(inventoryItem) * inventoryItem.getAmount();
+            }
+        }
+        return total;
     }
 
     private int getCoinDenomination(ItemStack stack) {
