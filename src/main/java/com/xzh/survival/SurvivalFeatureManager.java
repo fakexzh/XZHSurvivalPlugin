@@ -234,18 +234,18 @@ public final class SurvivalFeatureManager implements Listener {
         }
 
         if (level >= 3) {
-            ItemStack helmet = equipment.getHelmet();
-            ItemStack chestplate = equipment.getChestplate();
-            ItemStack leggings = equipment.getLeggings();
-            ItemStack boots = equipment.getBoots();
-            enchantArmor(helmet);
-            enchantArmor(chestplate);
-            enchantArmor(leggings);
-            enchantArmor(boots);
-            equipment.setHelmet(helmet);
-            equipment.setChestplate(chestplate);
-            equipment.setLeggings(leggings);
-            equipment.setBoots(boots);
+            ItemStack helmetItem = equipment.getHelmet();
+            ItemStack chestplateItem = equipment.getChestplate();
+            ItemStack leggingsItem = equipment.getLeggings();
+            ItemStack bootsItem = equipment.getBoots();
+            enchantArmor(helmetItem);
+            enchantArmor(chestplateItem);
+            enchantArmor(leggingsItem);
+            enchantArmor(bootsItem);
+            equipment.setHelmet(helmetItem);
+            equipment.setChestplate(chestplateItem);
+            equipment.setLeggings(leggingsItem);
+            equipment.setBoots(bootsItem);
         }
         equipment.setDropChance(EquipmentSlot.HEAD, 0.0f);
         equipment.setDropChance(EquipmentSlot.CHEST, 0.0f);
