@@ -71,7 +71,7 @@ public final class AdventureLootManager implements Listener {
         }
         double coinChance = Math.min(0.30, plugin.getConfig().getDouble("adventure-loot.mob-loot.coin-drop-chance", 0.15) + (mobLevel - 1) * 0.001);
         if (random.nextDouble() < coinChance) {
-            ItemStack coin = rollCoinReward("adventure-loot.mob-loot");
+            ItemStack coin = rollCoinReward("adventure-loot.mob-loot", mobLevel >= 80 ? 1000 : mobLevel >= 50 ? 100 : mobLevel >= 20 ? 10 : 1);
             if (coin != null) event.getDrops().add(coin);
         }
         double extremeChance = Math.min(0.002, plugin.getConfig().getDouble("adventure-loot.mob-loot.extreme-rare-chance", 0.001) + (mobLevel - 1) * 0.00001);
@@ -227,12 +227,22 @@ public final class AdventureLootManager implements Listener {
     }
 
     private ItemStack rollCoinReward(String path) {
-        // Higher denominations are intentionally rare; the economy plugin creates the authentic coin.
+        return rollCoinReward(path, 10);
+    }
+
+    private ItemStack rollCoinReward(String path, int maximumDenomination) {
+        // 100/1000 coins are reserved for very high-level mobs; other sources cap at 10.
+        if (maximumDenomination < 10) {
+            return createOfficialCoin(1, random.nextDouble() < plugin.getConfig().getDouble(path + ".multiple-coins-chance", 0.005)
+                    ? 2 + random.nextInt(3) : 1);
+        }
         double jackpot = plugin.getConfig().getDouble(path + ".coin-1000-chance", 0.0001);
         double hundred = plugin.getConfig().getDouble(path + ".coin-100-chance", 0.001);
         double ten = plugin.getConfig().getDouble(path + ".coin-10-chance", 0.025);
         double roll = random.nextDouble();
-        int denomination = roll < jackpot ? 1000 : roll < jackpot + hundred ? 100 : roll < jackpot + hundred + ten ? 10 : 1;
+        int denomination = maximumDenomination >= 1000 && roll < jackpot ? 1000
+                : maximumDenomination >= 100 && roll < jackpot + hundred ? 100
+                : maximumDenomination >= 10 && roll < jackpot + hundred + ten ? 10 : 1;
         int amount = random.nextDouble() < plugin.getConfig().getDouble(path + ".multiple-coins-chance", 0.005) ? 2 + random.nextInt(3) : 1;
         return createOfficialCoin(denomination, amount);
     }
