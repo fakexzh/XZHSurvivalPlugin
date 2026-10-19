@@ -54,10 +54,12 @@ public final class AdventureLootManager implements Listener {
                 || !plugin.getConfig().getBoolean("adventure-loot.mob-loot.enabled", true)) return;
         LivingEntity mob = event.getEntity();
         if (mob.getKiller() == null) return;
-        // Tag vanilla mob drops one tick later so each dropped item gets a first-pickup notice.
+        // Tag nearby drops one tick later using a captured location; the dead mob entity may already be invalid.
+        org.bukkit.Location deathLocation = mob.getLocation().clone();
+        org.bukkit.World deathWorld = mob.getWorld();
         Bukkit.getScheduler().runTask(plugin, () -> {
-            if (!mob.getWorld().isChunkLoaded(mob.getLocation().getBlockX() >> 4, mob.getLocation().getBlockZ() >> 4)) return;
-            for (Entity nearby : mob.getNearbyEntities(4.0, 4.0, 4.0)) {
+            if (!deathWorld.isChunkLoaded(deathLocation.getBlockX() >> 4, deathLocation.getBlockZ() >> 4)) return;
+            for (Entity nearby : deathWorld.getNearbyEntities(deathLocation, 4.0, 4.0, 4.0)) {
                 if (nearby instanceof Item dropped && !isXzhCoin(dropped.getItemStack())) markMobLoot(dropped);
             }
         });
@@ -142,7 +144,9 @@ public final class AdventureLootManager implements Listener {
                     + (stack.getAmount() == 1 ? "" : "s") + " §7(+" + ((long) denomination * stack.getAmount()) + " total)");
             return;
         }
-        if (item.getPersistentDataContainer().has(mobLootKey, PersistentDataType.BYTE)
+        if (plugin.getConfig().getBoolean("adventure-loot.mob-loot.first-pickup-announcements", true)
+                && plugin.getConfig().getBoolean("adventure-loot.pickup-messages.mob-loot-first-pickup-only", true)
+                && item.getPersistentDataContainer().has(mobLootKey, PersistentDataType.BYTE)
                 && announcedMobDrops.add(item.getUniqueId())) {
             event.getPlayer().sendMessage("§a[Loot] §f+" + stack.getAmount() + " " + prettyName(stack.getType()));
         }
