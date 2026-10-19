@@ -156,13 +156,16 @@ public final class SurvivalFeatureManager implements Listener {
     }
 
     private void updateTab(Player player) {
-        int online = Bukkit.getOnlinePlayers().size();
         int level = getMonsterLevel(player);
-        player.setPlayerListName(player.getName() + " §d[L" + level + "] §e" + Math.max(0, player.getPing()) + "ms");
+        int ping = Math.max(0, player.getPing());
+        long lifetimeSeconds = playtimeSeconds.getOrDefault(player.getUniqueId(), 0L);
+
+        // Keep each player row minimal: white username followed by a green numeric ping.
+        player.setPlayerListName("§f" + player.getName() + " §8| §a" + ping + "ms");
+        // The header/footer stay clean and show this viewer's own level and saved all-time playtime.
         player.setPlayerListHeaderFooter(
-                "§d§lNETWORK §f• §d" + online + " ONLINE",
-                "§dMONSTER LEVEL §d" + level + " §8| §7Your playtime: §f" + formatPlaytime(
-                        playtimeSeconds.getOrDefault(player.getUniqueId(), 0L)));
+                "§d§lXZH SURVIVAL\n§8━━━━━━━━━━━━━━━━",
+                "\n§6Monster Level: §d" + level + "§8/§d100 §8| §bPlay Time: §f" + formatPlaytime(lifetimeSeconds));
     }
 
     private void refreshAllTabs() {
