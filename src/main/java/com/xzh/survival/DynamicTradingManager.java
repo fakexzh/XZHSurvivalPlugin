@@ -86,9 +86,11 @@ public final class DynamicTradingManager implements Listener {
     private List<MerchantRecipe> makeSpecialOffers(boolean wandering) {
         List<MerchantRecipe> offers = new ArrayList<>();
         // NPC buys selected goods from players and pays with authentic physical XZH coins.
-        addOffer(offers, createOfficialCoin(1, 1), new ItemStack(Material.IRON_INGOT, 16));
-        addOffer(offers, createOfficialCoin(10, 1), new ItemStack(Material.GOLD_INGOT, 4));
-        addOffer(offers, createOfficialCoin(10, 1), new ItemStack(Material.DIAMOND, 1));
+        // Approximate the economy shop's current resale values, then vary offers so not every deal is best-in-server.
+        // Shop sell values: iron 7.5 each, gold 12 each, diamond 5 each. Output is physical XZH coin currency.
+        addOffer(offers, createOfficialCoin(10, 13 + random.nextInt(3)), new ItemStack(Material.IRON_INGOT, 16));
+        addOffer(offers, createOfficialCoin(10, 5 + random.nextInt(2)), new ItemStack(Material.GOLD_INGOT, 4));
+        addOffer(offers, createOfficialCoin(1, 4 + random.nextInt(3)), new ItemStack(Material.DIAMOND, 1));
 
         // Limited rotating stock: a player can buy each special item once per refresh cycle.
         ItemStack stock = new ItemStack(wandering ? Material.SADDLE : Material.NAME_TAG, 1);
