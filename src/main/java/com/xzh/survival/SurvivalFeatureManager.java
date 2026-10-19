@@ -234,17 +234,18 @@ public final class SurvivalFeatureManager implements Listener {
         }
 
         if (level >= 3) {
-            for (ItemStack armor : new ItemStack[]{
-                    equipment.getHelmet(), equipment.getChestplate(),
-                    equipment.getLeggings(), equipment.getBoots()}) {
-                if (armor != null && !armor.getType().isAir() && random.nextDouble() < 0.15) {
-                    addEnchantment(armor, "protection", 1);
-                }
-            }
-            equipment.setHelmet(equipment.getHelmet());
-            equipment.setChestplate(equipment.getChestplate());
-            equipment.setLeggings(equipment.getLeggings());
-            equipment.setBoots(equipment.getBoots());
+            ItemStack helmet = equipment.getHelmet();
+            ItemStack chestplate = equipment.getChestplate();
+            ItemStack leggings = equipment.getLeggings();
+            ItemStack boots = equipment.getBoots();
+            enchantArmor(helmet);
+            enchantArmor(chestplate);
+            enchantArmor(leggings);
+            enchantArmor(boots);
+            equipment.setHelmet(helmet);
+            equipment.setChestplate(chestplate);
+            equipment.setLeggings(leggings);
+            equipment.setBoots(boots);
         }
         equipment.setDropChance(EquipmentSlot.HEAD, 0.0f);
         equipment.setDropChance(EquipmentSlot.CHEST, 0.0f);
@@ -252,6 +253,12 @@ public final class SurvivalFeatureManager implements Listener {
         equipment.setDropChance(EquipmentSlot.FEET, 0.0f);
         equipment.setDropChance(EquipmentSlot.HAND, 0.0f);
         equipment.setDropChance(EquipmentSlot.OFF_HAND, 0.0f);
+    }
+
+    private void enchantArmor(ItemStack armor) {
+        if (armor != null && !armor.getType().isAir() && random.nextDouble() < 0.15) {
+            addEnchantment(armor, "protection", 1);
+        }
     }
 
     private void addEnchantment(ItemStack item, String key, int level) {
@@ -268,8 +275,17 @@ public final class SurvivalFeatureManager implements Listener {
         }
         Location eye = player.getEyeLocation();
         double range = Math.max(1.0, plugin.getConfig().getDouble("combat-indicators.target-range", 6.0));
+        double entityRange = range;
+        RayTraceResult blockTrace = player.getWorld().rayTraceBlocks(eye, eye.getDirection(), range);
+        if (blockTrace != null) {
+            entityRange = Math.min(range, eye.distance(blockTrace.getHitPosition().toLocation(eye.getWorld())));
+        }
+        if (entityRange <= 0.05) {
+            removeHealthDisplay(player.getUniqueId());
+            return;
+        }
         RayTraceResult trace = player.getWorld().rayTraceEntities(
-                eye, eye.getDirection(), range, 0.1,
+                eye, eye.getDirection(), entityRange, 0.1,
                 entity -> entity instanceof LivingEntity
                         && !(entity instanceof Player)
                         && !(entity instanceof ArmorStand)
