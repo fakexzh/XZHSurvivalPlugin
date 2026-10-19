@@ -7,7 +7,6 @@ import org.bukkit.Tag;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.data.type.Leaves;
-import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -20,7 +19,6 @@ import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import java.io.File;
 import java.lang.reflect.Method;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -53,7 +51,12 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         ItemStack tool = player.getInventory().getItemInMainHand();
         Material required = Material.matchMaterial(getConfig().getString("tree-felling.minimum-axe", "IRON") + "_AXE");
         if (required == null) required = Material.IRON_AXE;
-        if (tool.getType().ordinal() < required.ordinal() || !tool.getType().name().endsWith("_AXE")) return;
+        String axe = tool.getType().name();
+        if (required == Material.IRON_AXE) {
+            if (!axe.equals("IRON_AXE") && !axe.equals("DIAMOND_AXE") && !axe.equals("NETHERITE_AXE")) return;
+        } else if (!axe.endsWith("_AXE")) {
+            return;
+        }
 
         Block start = event.getBlock();
         if (!Tag.LOGS.isTagged(start.getType())) return;
