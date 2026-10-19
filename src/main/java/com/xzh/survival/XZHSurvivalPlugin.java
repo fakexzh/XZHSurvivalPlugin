@@ -71,7 +71,8 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
 
         List<Block> logs = collectConnectedLogs(start,
                 getConfig().getInt("tree-felling.maximum-logs", 256));
-        if (logs.size() < 2 || leaves.size() <
+        List<Block> nearbyLeaves = collectNearbyLeaves(logs);
+        if (logs.size() < 2 || nearbyLeaves.size() <
                 getConfig().getInt("tree-felling.minimum-leaves", 6)) return;
 
         Map<Material, Integer> requiredTotals = new HashMap<>();
