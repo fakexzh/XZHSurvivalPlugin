@@ -45,9 +45,10 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
     private static final class Contract {
         UUID owner, target;
         String tier, world;
-        double x, y, z;
+        double x, y, z, entryPrice;
+        int rewardPercent;
         long remainingSeconds, lastSavedAt;
-        Contract(UUID owner, String tier, long seconds) { this.owner=owner; this.tier=tier; this.remainingSeconds=seconds; }
+        Contract(UUID owner, String tier, long seconds) { this.owner=owner; this.tier=tier; this.remainingSeconds=seconds; this.rewardPercent=30 + new Random().nextInt(31); }
     }
 
     public BountyHuntManager(JavaPlugin plugin) {
@@ -132,6 +133,8 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
             long defaultSeconds = tier.equals("common") ? 25*60L : tier.equals("rare") ? 45*60L : 2*60*60L;
             long seconds = plugin.getConfig().getLong("bounty-hunt.timers-seconds." + tier, defaultSeconds);
             Contract c = new Contract(player.getUniqueId(), tier, seconds);
+            Double mapPrice = meta.getPersistentDataContainer().get(new NamespacedKey("xzheconomysystem", "mission_entry_price"), PersistentDataType.DOUBLE);
+            c.entryPrice = mapPrice == null || mapPrice <= 0 ? (tier.equalsIgnoreCase("legendary") ? 600 : tier.equalsIgnoreCase("rare") ? 300 : 100) : mapPrice;
             active.put(player.getUniqueId(), c);
             giveEquipment(player, c);
             spawnTarget(player, c);
