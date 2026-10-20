@@ -47,6 +47,7 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
     @Override
     public void onEnable() {
         saveDefaultConfig();
+        migrateSurvivalConfig();
         getServer().getPluginManager().registerEvents(this, this);
         customTimeManager = new CustomTimeManager(this);
         customTimeManager.start();
@@ -64,6 +65,24 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         roamingBossManager.start();
         if (getCommand("bounty") != null) getCommand("bounty").setExecutor(bountyHuntManager);
         getLogger().info("XZH Survival Plugin enabled.");
+    }
+
+    private void migrateSurvivalConfig() {
+        boolean changed = false;
+        // Upgrade the plugin's former bundled bounty defaults without overriding custom server values.
+        if (getConfig().getInt("bounty-hunt.rewards.common", -1) == 500) {
+            getConfig().set("bounty-hunt.rewards.common", 200);
+            changed = true;
+        }
+        if (getConfig().getInt("bounty-hunt.rewards.rare", -1) == 1300) {
+            getConfig().set("bounty-hunt.rewards.rare", 500);
+            changed = true;
+        }
+        if (getConfig().getInt("bounty-hunt.rewards.legendary", -1) == 3500) {
+            getConfig().set("bounty-hunt.rewards.legendary", 900);
+            changed = true;
+        }
+        if (changed) saveConfig();
     }
 
     @Override
