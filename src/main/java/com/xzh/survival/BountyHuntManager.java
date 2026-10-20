@@ -303,8 +303,8 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
         bow.setItemMeta(bm);
         ItemStack arrow = new ItemStack(Material.ARROW);
         ItemMeta am = arrow.getItemMeta();
-        am.setDisplayName("§dTracking Arrow");
-        am.setLore(List.of("§7Hold and right-click to locate your bounty target."));
+        am.setDisplayName("§dHunter's Arrow");
+        am.setLore(List.of("§7Ammunition for your Hunter's Bow."));
         am.getPersistentDataContainer().set(arrowKey, PersistentDataType.BYTE, (byte)1);
         am.getPersistentDataContainer().set(contractOwnerKey, PersistentDataType.STRING, c.owner.toString());
         arrow.setItemMeta(am);
