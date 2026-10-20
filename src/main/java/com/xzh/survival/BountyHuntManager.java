@@ -107,7 +107,7 @@ public final class BountyHuntManager implements Listener {
             }
             player.setCompassTarget(target.getLocation());
             player.sendActionBar("§dBounty target direction §8• §f" + (int) player.getLocation().distance(target.getLocation()) + " blocks away");
-            player.spawnParticle(Particle.END_ROD, player.getEyeLocation().add(player.getEyeLocation().getDirection().multiply(1.2)), 8, 0.2, 0.2, 0.2, 0.02);
+            player.getWorld().spawnParticle(Particle.END_ROD, player.getEyeLocation().add(player.getEyeLocation().getDirection().multiply(1.2)), 8, 0.2, 0.2, 0.2, 0.02);
             player.sendMessage("§dTracking pulse sent. Follow the direction shown above.");
         }
     }
@@ -200,11 +200,9 @@ public final class BountyHuntManager implements Listener {
         Contract c=active.get(ownerId);
         if (c==null || !event.getEntity().getUniqueId().equals(c.target)) return;
         Player owner=Bukkit.getPlayer(ownerId);
-        if (owner!=null) {
-            int reward=c.tier.equals("legendary")?2500:c.tier.equals("rare")?900:300;
-            payReward(owner,reward);
-            owner.sendMessage("§a§lBOUNTY COMPLETE! §fReward: §e"+reward+" coins.");
-        }
+        int reward=c.tier.equals("legendary")?2500:c.tier.equals("rare")?900:300;
+        payReward(ownerId,reward);
+        if (owner!=null) owner.sendMessage("§a§lBOUNTY COMPLETE! §fReward: §e"+reward+" coins.");
         finish(ownerId,"completed");
     }
 
@@ -270,17 +268,22 @@ public final class BountyHuntManager implements Listener {
         }
     }
 
-    private void payReward(Player player,int amount) {
+    private void payReward(UUID playerId,int amount) {
         Plugin economy=Bukkit.getPluginManager().getPlugin("XZHEconomySystem");
-        if(economy==null||!economy.isEnabled()) { player.sendMessage("§cEconomy unavailable; reward could not be paid. Contact an admin."); return; }
+        if(economy==null||!economy.isEnabled()) {
+            Player online=Bukkit.getPlayer(playerId);
+            if(online!=null) online.sendMessage("§cEconomy unavailable; reward could not be paid. Contact an admin.");
+            return;
+        }
         try {
             Method getBalance=economy.getClass().getMethod("getBalance",UUID.class);
             Method setBalance=economy.getClass().getMethod("setBalance",UUID.class,double.class);
-            double balance=((Number)getBalance.invoke(economy,player.getUniqueId())).doubleValue();
-            setBalance.invoke(economy,player.getUniqueId(),balance+amount);
+            double balance=((Number)getBalance.invoke(economy,playerId)).doubleValue();
+            setBalance.invoke(economy,playerId,balance+amount);
         } catch(ReflectiveOperationException|RuntimeException ex) {
             plugin.getLogger().warning("Could not pay bounty reward: "+ex.getClass().getSimpleName());
-            player.sendMessage("§cEconomy reward failed; contact an admin.");
+            Player online=Bukkit.getPlayer(playerId);
+            if(online!=null) online.sendMessage("§cEconomy reward failed; contact an admin.");
         }
     }
 
