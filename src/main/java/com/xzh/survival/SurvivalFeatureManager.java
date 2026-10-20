@@ -51,6 +51,7 @@ public final class SurvivalFeatureManager implements Listener {
     private final JavaPlugin plugin;
     private final Random random = new Random();
     private final Map<UUID, Long> playtimeSeconds = new HashMap<>();
+    private final Map<UUID, Integer> announcedMonsterLevels = new HashMap<>();
     private final Map<UUID, TextDisplay> healthDisplays = new HashMap<>();
     private final Map<UUID, UUID> healthTargets = new HashMap<>();
     private final NamespacedKey monsterLevelKey;
@@ -69,9 +70,14 @@ public final class SurvivalFeatureManager implements Listener {
 
     public void start() {
         loadPlaytime();
+        if (plugin.getConfig().getLong("mob-progression.hours-per-level", 3L) != 1L) {
+            plugin.getConfig().set("mob-progression.hours-per-level", 1L);
+            plugin.saveConfig();
+        }
         Bukkit.getPluginManager().registerEvents(this, plugin);
         for (Player player : Bukkit.getOnlinePlayers()) {
             syncLifetimePlaytime(player);
+            initializeLevelAnnouncements(player);
             hideOtherPlayersHealthDisplays(player);
             updateTab(player);
         }
@@ -96,6 +102,7 @@ public final class SurvivalFeatureManager implements Listener {
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
         syncLifetimePlaytime(player);
+        initializeLevelAnnouncements(player);
         hideOtherPlayersHealthDisplays(player);
         updateTab(player);
         Bukkit.getScheduler().runTask(plugin, this::refreshAllTabs);
@@ -148,6 +155,7 @@ public final class SurvivalFeatureManager implements Listener {
             // Vanilla's persisted play-time statistic survives reconnects and server restarts.
             // Keep our saved counter as a fallback, and never let lifetime playtime move backwards.
             syncLifetimePlaytime(player);
+            announceLevelProgress(player);
             updateTab(player);
             updateTargetHealth(player);
         }
@@ -189,9 +197,39 @@ public final class SurvivalFeatureManager implements Listener {
         return minutes + "m";
     }
 
+    private void initializeLevelAnnouncements(Player player) {
+        UUID id = player.getUniqueId();
+        if (announcedMonsterLevels.containsKey(id)) return;
+        int currentLevel = getMonsterLevel(player);
+        long savedSeconds = playtimeSeconds.getOrDefault(id, 0L);
+        if (savedSeconds == 0L) {
+            Bukkit.broadcastMessage("§d§lXZH Survival §8» §f@" + player.getName() + " §ahas reached Monster Level 1!");
+            announcedMonsterLevels.put(id, 1);
+        } else {
+            // Avoid spamming old level announcements for players already established before this update.
+            announcedMonsterLevels.put(id, currentLevel);
+        }
+    }
+
+    private void announceLevelProgress(Player player) {
+        UUID id = player.getUniqueId();
+        int currentLevel = getMonsterLevel(player);
+        Integer previousAnnounced = announcedMonsterLevels.get(id);
+        if (previousAnnounced == null) {
+            announcedMonsterLevels.put(id, currentLevel);
+            return;
+        }
+        if (currentLevel <= previousAnnounced) return;
+        for (int level = previousAnnounced + 1; level <= currentLevel; level++) {
+            Bukkit.broadcastMessage("§d§lXZH Survival §8» §f@" + player.getName() + " §ahas reached Monster Level " + level + "!");
+        }
+        announcedMonsterLevels.put(id, currentLevel);
+        savePlaytime();
+    }
+
     private int getMonsterLevel(Player player) {
         long seconds = playtimeSeconds.getOrDefault(player.getUniqueId(), 0L);
-        long hoursPerLevel = Math.max(1L, plugin.getConfig().getLong("mob-progression.hours-per-level", 3L));
+        long hoursPerLevel = 1L;
         int maxLevel = Math.max(1, plugin.getConfig().getInt("mob-progression.maximum-level", 5));
         long progressedLevels = seconds / (hoursPerLevel * 3600L);
         return (int) Math.min(maxLevel, 1L + progressedLevels);
@@ -455,20 +493,33 @@ public final class SurvivalFeatureManager implements Listener {
         if (!playtimeFile.exists()) return;
         playtimeData.loadConfiguration(playtimeFile);
         ConfigurationSection section = playtimeData.getConfigurationSection("players");
-        if (section == null) return;
-        for (String key : section.getKeys(false)) {
+        if (section != null) for (String key : section.getKeys(false)) {
             try {
                 playtimeSeconds.put(UUID.fromString(key), Math.max(0L, section.getLong(key, 0L)));
             } catch (IllegalArgumentException exception) {
                 plugin.getLogger().warning("Ignoring invalid player UUID in playtime.yml: " + key);
             }
         }
+        ConfigurationSection announced = playtimeData.getConfigurationSection("announced-levels");
+        if (announced != null) {
+            for (String key : announced.getKeys(false)) {
+                try {
+                    announcedMonsterLevels.put(UUID.fromString(key), Math.max(1, announced.getInt(key, 1)));
+                } catch (IllegalArgumentException exception) {
+                    plugin.getLogger().warning("Ignoring invalid player UUID in announced-levels: " + key);
+                }
+            }
+        }
     }
 
     private void savePlaytime() {
         playtimeData.set("players", null);
+        playtimeData.set("announced-levels", null);
         for (Map.Entry<UUID, Long> entry : playtimeSeconds.entrySet()) {
             playtimeData.set("players." + entry.getKey(), entry.getValue());
+        }
+        for (Map.Entry<UUID, Integer> entry : announcedMonsterLevels.entrySet()) {
+            playtimeData.set("announced-levels." + entry.getKey(), entry.getValue());
         }
         try {
             if (!plugin.getDataFolder().exists() && !plugin.getDataFolder().mkdirs()) {
