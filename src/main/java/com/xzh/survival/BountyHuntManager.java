@@ -15,6 +15,9 @@ import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.block.Action;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
+import org.bukkit.inventory.Inventory;
+import org.bukkit.event.inventory.InventoryOpenEvent;
+import org.bukkit.block.Chest;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
@@ -34,6 +37,7 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
     private final org.bukkit.configuration.file.YamlConfiguration data = new org.bukkit.configuration.file.YamlConfiguration();
     private final Map<UUID, Contract> active = new HashMap<>();
     private final Map<UUID, BossBar> contractBossBars = new HashMap<>();
+    private final Map<UUID, Location> activeTreasures = new HashMap<>();
     private final Random random = new Random();
 
     private static final class Contract {
@@ -94,6 +98,15 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
         ItemStack hand = event.getItem();
         if (hand == null || !hand.hasItemMeta()) return;
         ItemMeta meta = hand.getItemMeta();
+        boolean treasureMap = meta.getPersistentDataContainer().getKeys().stream()
+                .anyMatch(key -> key.getNamespace().equals("xzheconomysystem")
+                        && key.getKey().equals("treasure_hunt_map")
+                        && meta.getPersistentDataContainer().has(key, PersistentDataType.BYTE));
+        if (treasureMap) {
+            event.setCancelled(true);
+            startTreasureHunt(player, hand);
+            return;
+        }
         String tier = null;
         for (NamespacedKey key : meta.getPersistentDataContainer().getKeys()) {
             if (key.getNamespace().equals("xzheconomysystem") && key.getKey().equals("bounty_tier")) {
@@ -157,6 +170,94 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
             player.getWorld().spawnParticle(Particle.END_ROD, player.getEyeLocation().add(player.getEyeLocation().getDirection().multiply(1.2)), 8, 0.2, 0.2, 0.2, 0.02);
             player.sendMessage("§dTracking Eye launched! Follow its direction and the compass bearing.");
         }
+    }
+
+    private void startTreasureHunt(Player player, ItemStack map) {
+        Location existing = activeTreasures.get(player.getUniqueId());
+        if (existing != null && existing.getBlock().getType() == Material.CHEST) {
+            player.setCompassTarget(existing);
+            player.sendMessage("§6You already have an active treasure hunt. Follow your compass to the buried chest.");
+            return;
+        }
+        if (player.getWorld().getEnvironment() != World.Environment.NORMAL) {
+            player.sendMessage("§cTreasure Hunt Maps can only be activated in the Overworld. Your map was not consumed.");
+            return;
+        }
+        World world = player.getWorld();
+        Location origin = player.getLocation();
+        Location chestLocation = null;
+        for (int attempt = 0; attempt < 40; attempt++) {
+            double angle = random.nextDouble() * Math.PI * 2.0;
+            int distance = 180 + random.nextInt(221);
+            int x = origin.getBlockX() + (int)Math.round(Math.cos(angle) * distance);
+            int z = origin.getBlockZ() + (int)Math.round(Math.sin(angle) * distance);
+            int surfaceY = world.getHighestBlockYAt(x, z);
+            if (surfaceY <= world.getMinHeight() + 3 || surfaceY >= world.getMaxHeight() - 3) continue;
+            Material surfaceType = world.getBlockAt(x, surfaceY, z).getType();
+            Material groundType = world.getBlockAt(x, surfaceY - 2, z).getType();
+            if (!surfaceType.isSolid() || surfaceType.isLiquid() || surfaceType.name().contains("LEAVES")
+                    || !groundType.isSolid()) continue;
+            Location candidate = new Location(world, x, surfaceY - 1, z);
+            if (candidate.getBlock().getType() == Material.BEDROCK
+                    || candidate.getBlock().getType() == Material.CHEST) continue;
+            chestLocation = candidate;
+            break;
+        }
+        if (chestLocation == null) {
+            player.sendMessage("§cCouldn't find a safe treasure location nearby. Your map was not consumed; try again in a different area.");
+            return;
+        }
+        chestLocation.getBlock().setType(Material.CHEST, false);
+        if (chestLocation.getBlock().getState() instanceof Chest chest) {
+            Inventory inventory = chest.getBlockInventory();
+            inventory.addItem(new ItemStack(Material.DIAMOND, 2 + random.nextInt(4)));
+            inventory.addItem(new ItemStack(Material.EMERALD, 5 + random.nextInt(8)));
+            inventory.addItem(new ItemStack(Material.GOLD_INGOT, 6 + random.nextInt(11)));
+            inventory.addItem(new ItemStack(Material.IRON_INGOT, 12 + random.nextInt(13)));
+            if (random.nextInt(3) == 0) inventory.addItem(new ItemStack(Material.GOLDEN_APPLE, 1));
+            chest.update(true, false);
+        }
+        activeTreasures.put(player.getUniqueId(), chestLocation.clone());
+        player.setCompassTarget(chestLocation);
+        try {
+            EnderSignal signal = world.spawn(player.getEyeLocation(), EnderSignal.class);
+            signal.setTargetLocation(chestLocation);
+            signal.setDropItem(false);
+            signal.setDespawnTimer(80);
+        } catch (RuntimeException ex) {
+            plugin.getLogger().warning("Could not spawn treasure tracking Eye of Ender: " + ex.getClass().getSimpleName());
+        }
+        if (map.getAmount() <= 1) player.getInventory().setItemInMainHand(null);
+        else map.setAmount(map.getAmount() - 1);
+        player.updateInventory();
+        player.sendMessage("§6§lXZH TREASURE HUNT");
+        player.sendMessage("§eAn Eye of Ender has launched toward your buried treasure!");
+        player.sendMessage("§fFollow your compass. The chest is hidden one block below the surface.");
+        player.sendActionBar("§6Treasure located §8• §f" + (int)player.getLocation().distance(chestLocation) + " blocks away");
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onTreasureChestOpen(InventoryOpenEvent event) {
+        if (!(event.getPlayer() instanceof Player player)) return;
+        Location opened = event.getInventory().getLocation();
+        if (opened == null) return;
+        UUID foundOwner = null;
+        for (Map.Entry<UUID, Location> entry : activeTreasures.entrySet()) {
+            Location target = entry.getValue();
+            if (target.getWorld().equals(opened.getWorld()) && target.getBlockX() == opened.getBlockX()
+                    && target.getBlockY() == opened.getBlockY() && target.getBlockZ() == opened.getBlockZ()) {
+                foundOwner = entry.getKey();
+                break;
+            }
+        }
+        if (foundOwner == null) return;
+        activeTreasures.remove(foundOwner);
+        player.sendMessage("§a§lTREASURE FOUND! §fThe buried chest is yours to loot.");
+        Player owner = Bukkit.getPlayer(foundOwner);
+        if (owner != null && !owner.getUniqueId().equals(player.getUniqueId())) {
+            owner.sendMessage("§cYour treasure chest was found by " + player.getName() + ".");
+        }
+        Bukkit.broadcastMessage("§6[XZH Treasure Hunt] §f" + player.getName() + " discovered a buried treasure!");
     }
 
     private int countEmptyHotbarSlots(PlayerInventory inv) {
