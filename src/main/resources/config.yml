@@ -56,10 +56,10 @@ adventure-loot:
   mob-loot:
     enabled: true
     first-pickup-announcements: true
-    common-extra-chance: 0.12
-    rare-extra-chance: 0.025
-    extreme-rare-chance: 0.001
-    coin-drop-chance: 0.15
+    common-extra-chance: 0.04
+    rare-extra-chance: 0.005
+    extreme-rare-chance: 0.0002
+    coin-drop-chance: 0.08
     coin-10-chance: 0.025
     coin-100-chance: 0.001
     coin-1000-chance: 0.0001
@@ -97,6 +97,5 @@ dynamic-trading:
 
 # TAB player list and lightweight combat feedback.
 combat-indicators:
-  damage-numbers-enabled: true
   target-health-enabled: true
   target-range: 6.0
