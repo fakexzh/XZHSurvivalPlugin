@@ -95,6 +95,17 @@ dynamic-trading:
   compare-against-economy-shop: true
   prevent-buy-sell-arbitrage: true
 
+# Bounty contracts start when a purchased map is right-clicked.
+bounty-hunt:
+  timers-seconds:
+    common: 1500
+    rare: 2700
+    legendary: 7200
+  rewards:
+    common: 500
+    rare: 1300
+    legendary: 3500
+
 # TAB player list and lightweight combat feedback.
 combat-indicators:
   target-health-enabled: true
