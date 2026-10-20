@@ -104,7 +104,7 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
                         && meta.getPersistentDataContainer().has(key, PersistentDataType.BYTE));
         if (treasureMap) {
             event.setCancelled(true);
-            startTreasureHunt(player, hand);
+            startTreasureHunt(player, hand, event.getHand());
             return;
         }
         String tier = null;
@@ -164,7 +164,7 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
         }
     }
 
-    private void startTreasureHunt(Player player, ItemStack map) {
+    private void startTreasureHunt(Player player, ItemStack map, org.bukkit.inventory.EquipmentSlot handSlot) {
         Location existing = activeTreasures.get(player.getUniqueId());
         if (existing != null && existing.getBlock().getType() == Material.CHEST) {
             player.setCompassTarget(existing);
