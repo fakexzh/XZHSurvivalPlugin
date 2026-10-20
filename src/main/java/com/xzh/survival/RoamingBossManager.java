@@ -38,7 +38,6 @@ import java.util.UUID;
 
 public final class RoamingBossManager implements Listener {
     private static final double BOSSBAR_RANGE = 32.0;
-    private static final int BANK_REWARD = 750;
     private final JavaPlugin plugin;
     private final NamespacedKey bossKey;
     private final NamespacedKey sealKey;
@@ -99,6 +98,7 @@ public final class RoamingBossManager implements Listener {
                 }
             }
         }
+        if (!plugin.getConfig().getBoolean("roaming-bosses.enabled", true)) return;
         if (ticks % 30 != 0 || bosses.size() >= 3) return;
         for (Player player : Bukkit.getOnlinePlayers()) {
             if (player.getWorld().getEnvironment() != World.Environment.NORMAL) continue;
@@ -194,14 +194,15 @@ public final class RoamingBossManager implements Listener {
         if (held.getType().isAir() || !held.hasItemMeta()
                 || !held.getItemMeta().getPersistentDataContainer().has(sealKey, PersistentDataType.BYTE)) return;
         event.setCancelled(true);
-        if (!depositToBank(player.getUniqueId(), BANK_REWARD)) {
+        int reward = Math.max(1, plugin.getConfig().getInt("roaming-bosses.bank-reward", 750));
+        if (!depositToBank(player.getUniqueId(), reward)) {
             player.sendMessage("§cYour seal was not consumed because the XZH Bank could not be reached.");
             return;
         }
         if (held.getAmount() <= 1) player.getInventory().setItemInMainHand(null);
         else held.setAmount(held.getAmount() - 1);
-        player.sendMessage("§aWanderer's Seal redeemed! §e" + BANK_REWARD + " coins §awere deposited directly into your bank.");
-        Bukkit.broadcastMessage("§d[XZH Exploration] §f" + player.getName() + " redeemed a Wanderer's Seal for " + BANK_REWARD + " bank coins.");
+        player.sendMessage("§aWanderer's Seal redeemed! §e" + reward + " coins §awere deposited directly into your bank.");
+        Bukkit.broadcastMessage("§d[XZH Exploration] §f" + player.getName() + " redeemed a Wanderer's Seal for " + reward + " bank coins.");
     }
 
     private boolean depositToBank(UUID playerId, int amount) {
