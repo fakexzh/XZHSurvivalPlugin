@@ -24,7 +24,7 @@ import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.*;
 
-public final class BountyHuntManager implements Listener {
+public final class BountyHuntManager implements Listener, org.bukkit.command.CommandExecutor {
     private final JavaPlugin plugin;
     private final NamespacedKey bountyTierKey, contractOwnerKey, bowKey, arrowKey, targetKey;
     private final File dataFile;
@@ -59,6 +59,25 @@ public final class BountyHuntManager implements Listener {
     }
 
     public void shutdown() { save(); }
+
+    @Override
+    public boolean onCommand(org.bukkit.command.CommandSender sender, org.bukkit.command.Command command,
+                             String label, String[] args) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage("This command can only be used in-game.");
+            return true;
+        }
+        if (args.length == 1 && args[0].equalsIgnoreCase("cancel")) {
+            if (!active.containsKey(player.getUniqueId())) {
+                player.sendMessage("§cYou don't have an active bounty contract.");
+            } else {
+                finish(player.getUniqueId(), "abandoned");
+            }
+            return true;
+        }
+        player.sendMessage("§dBounty Hunt §8» §fUse /bounty cancel to abandon your active contract.");
+        return true;
+    }
 
     @EventHandler(ignoreCancelled = true)
     public void onUse(PlayerInteractEvent event) {
@@ -260,10 +279,13 @@ public final class BountyHuntManager implements Listener {
             String tagged=item.getItemMeta().getPersistentDataContainer().get(contractOwnerKey,PersistentDataType.STRING);
             if(owner.toString().equals(tagged)) inv.setItem(i,null);
         }
-        for(Entity e: inv.getHolder() instanceof Player p ? p.getWorld().getEntities() : Collections.<Entity>emptyList()) {
-            if(e instanceof Item dropped && dropped.getItemStack().hasItemMeta()) {
-                String tagged=dropped.getItemStack().getItemMeta().getPersistentDataContainer().get(contractOwnerKey,PersistentDataType.STRING);
-                if(owner.toString().equals(tagged)) dropped.remove();
+        for (World world : Bukkit.getWorlds()) {
+            for (Entity e : world.getEntities()) {
+                if (e instanceof Item dropped && dropped.getItemStack().hasItemMeta()) {
+                    String tagged = dropped.getItemStack().getItemMeta().getPersistentDataContainer()
+                            .get(contractOwnerKey, PersistentDataType.STRING);
+                    if (owner.toString().equals(tagged)) dropped.remove();
+                }
             }
         }
     }
