@@ -1,3 +1,10 @@
+# Replant mature crops from their harvest drops and award small vanilla XP orbs.
+farming:
+  enabled: true
+  auto-replant: true
+  xp-min: 1
+  xp-max: 2
+
 tree-felling:
   enabled: true
   minimum-axe: WOODEN
