@@ -67,7 +67,13 @@ public final class BountyHuntManager implements Listener {
         ItemStack hand = event.getItem();
         if (hand == null || !hand.hasItemMeta()) return;
         ItemMeta meta = hand.getItemMeta();
-        String tier = meta.getPersistentDataContainer().get(bountyTierKey, PersistentDataType.STRING);
+        String tier = null;
+        for (NamespacedKey key : meta.getPersistentDataContainer().getKeys()) {
+            if (key.getNamespace().equals("xzheconomysystem") && key.getKey().equals("bounty_tier")) {
+                tier = meta.getPersistentDataContainer().get(key, PersistentDataType.STRING);
+                break;
+            }
+        }
         if (tier != null) {
             event.setCancelled(true);
             if (active.containsKey(player.getUniqueId())) { player.sendMessage("§cYou already have an active bounty contract."); return; }
@@ -208,6 +214,10 @@ public final class BountyHuntManager implements Listener {
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
         Contract c=active.get(event.getPlayer().getUniqueId());
+        if(c==null) {
+            removeTaggedEquipment(event.getPlayer().getInventory(), event.getPlayer().getUniqueId());
+            return;
+        }
         if(c!=null) {
             Bukkit.getScheduler().runTaskLater(plugin,()->{
                 if(active.containsKey(event.getPlayer().getUniqueId())) {
@@ -275,6 +285,7 @@ public final class BountyHuntManager implements Listener {
     }
 
     private void save() {
+        for (String key : new HashSet<>(data.getKeys(false))) data.set(key, null);
         for(Contract c:active.values()) {
             String k=c.owner.toString();
             data.set(k+".tier",c.tier); data.set(k+".target",c.target==null?null:c.target.toString());
