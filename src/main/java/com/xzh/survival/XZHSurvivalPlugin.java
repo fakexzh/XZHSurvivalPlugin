@@ -84,13 +84,6 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         if (logs.size() < 2 || nearbyLeaves.size() <
                 getConfig().getInt("tree-felling.minimum-leaves", 6)) return;
 
-        Map<Material, Integer> requiredTotals = new HashMap<>();
-        for (Block log : logs) requiredTotals.merge(log.getType(), 1, Integer::sum);
-        if (!hasInventorySpace(player.getInventory(), requiredTotals)) {
-            player.sendMessage("§cYour inventory needs more space to fell this tree.");
-            return;
-        }
-
         // Take over the break so vanilla cannot re-break the first log or duplicate drops.
         event.setDropItems(false);
         event.setCancelled(true);
@@ -100,15 +93,19 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         List<Block> felledLogs = new ArrayList<>();
         for (Block log : logs) {
             if (tool.getType().isAir() || tool.getAmount() <= 0) break;
+            Material woodType = log.getType();
+            Location dropLocation = log.getLocation().add(0.5, 0.5, 0.5);
             log.setType(Material.AIR, false);
             felledLogs.add(log);
+            // Spawn real collectible item entities at the original log positions.
+            // Do not route wood through inventory or use fake animation-only items.
+            log.getWorld().dropItemNaturally(dropLocation, new ItemStack(woodType, 1));
             damageTool(tool);
             if (tool.getType().isAir() || tool.getAmount() <= 0) break;
         }
         if (felledLogs.isEmpty()) return;
 
         List<Block> leaves = collectNearbyLeaves(felledLogs);
-        playWoodFlyAnimation(player, felledLogs);
         new BukkitRunnable() {
             private int index = 0;
             @Override public void run() {
@@ -126,22 +123,7 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
             }
         }.runTaskTimer(this, 1L, 1L);
 
-        Map<Material, Integer> totals = new HashMap<>();
-        for (Block log : felledLogs) totals.merge(log.getType(), 1, Integer::sum);
-        for (Map.Entry<Material, Integer> entry : totals.entrySet()) {
-            int amount = entry.getValue();
-            while (amount > 0) {
-                int stack = Math.min(amount, entry.getKey().getMaxStackSize());
-                Map<Integer, ItemStack> leftovers = player.getInventory().addItem(
-                        new ItemStack(entry.getKey(), stack));
-                // Never silently delete logs if the inventory changed after the space check.
-                for (ItemStack leftover : leftovers.values()) {
-                    player.getWorld().dropItemNaturally(player.getLocation(), leftover);
-                }
-                amount -= stack;
-            }
-        }
-        player.sendMessage("§aTree felled! §f" + felledLogs.size() + " logs collected directly into your inventory.");
+        player.sendMessage("§aTree felled! §f" + felledLogs.size() + " logs dropped nearby. Walk over them to collect.");
     }
 
     private List<Block> collectConnectedLogs(Block start, int maximum) {
