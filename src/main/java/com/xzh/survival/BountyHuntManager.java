@@ -97,11 +97,12 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
             event.setCancelled(true);
             if (active.containsKey(player.getUniqueId())) { player.sendMessage("§cYou already have an active bounty contract."); return; }
             int emptyHotbarSlots = countEmptyHotbarSlots(player.getInventory());
-            if (emptyHotbarSlots < 1) { player.sendMessage("§cBounty cancelled: keep at least 3 hotbar slots available for the map and mission equipment."); return; }
+            if (emptyHotbarSlots < 1) { player.sendMessage("§cBounty cancelled: keep at least one other hotbar slot empty for mission equipment."); return; }
             int slot = player.getInventory().getHeldItemSlot();
             if (hand.getAmount() > 1) hand.setAmount(hand.getAmount() - 1);
             else player.getInventory().setItem(slot, null);
-            long seconds = tier.equals("common") ? 25*60L : tier.equals("rare") ? 45*60L : 2*60*60L;
+            long defaultSeconds = tier.equals("common") ? 25*60L : tier.equals("rare") ? 45*60L : 2*60*60L;
+            long seconds = plugin.getConfig().getLong("bounty-hunt.timers-seconds." + tier, defaultSeconds);
             Contract c = new Contract(player.getUniqueId(), tier, seconds);
             active.put(player.getUniqueId(), c);
             giveEquipment(player, c);
@@ -204,7 +205,8 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
         World w=Bukkit.getWorld(c.world);
         if (w==null) return;
         Location loc=new Location(w,c.x,c.y,c.z);
-        if (!w.isChunkLoaded(loc.getBlockX()>>4,loc.getBlockZ()>>4)) return;
+        if (!w.isChunkLoaded(loc.getBlockX()>>4,loc.getBlockZ()>>4)) w.getChunkAt(loc);
+        if (Bukkit.getEntity(c.target) != null) return;
         Player owner=Bukkit.getPlayer(c.owner);
         if (owner==null) return;
         spawnTarget(owner,c);
@@ -219,7 +221,8 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
         Contract c=active.get(ownerId);
         if (c==null || !event.getEntity().getUniqueId().equals(c.target)) return;
         Player owner=Bukkit.getPlayer(ownerId);
-        int reward=c.tier.equals("legendary")?2500:c.tier.equals("rare")?900:300;
+        int defaultReward=c.tier.equals("legendary")?3500:c.tier.equals("rare")?1300:500;
+        int reward=plugin.getConfig().getInt("bounty-hunt.rewards."+c.tier,defaultReward);
         payReward(ownerId,reward);
         if (owner!=null) owner.sendMessage("§a§lBOUNTY COMPLETE! §fReward: §e"+reward+" coins.");
         finish(ownerId,"completed");
