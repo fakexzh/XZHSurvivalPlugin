@@ -59,6 +59,7 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         farmingManager.start();
         bountyHuntManager = new BountyHuntManager(this);
         bountyHuntManager.start();
+        if (getCommand("bounty") != null) getCommand("bounty").setExecutor(bountyHuntManager);
         getLogger().info("XZH Survival Plugin enabled.");
     }
 
