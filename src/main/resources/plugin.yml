@@ -15,3 +15,6 @@ commands:
     usage: /customtime <set|info|on|off>
     aliases: [ct]
     permission: xzhsurvival.admin
+  bounty:
+    description: Manage your active bounty hunt
+    usage: /bounty <cancel>
