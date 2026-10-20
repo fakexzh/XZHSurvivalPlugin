@@ -116,6 +116,11 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
         }
         if (meta.getPersistentDataContainer().has(arrowKey, PersistentDataType.BYTE)) {
             event.setCancelled(true);
+            String itemOwner = meta.getPersistentDataContainer().get(contractOwnerKey, PersistentDataType.STRING);
+            if (!player.getUniqueId().toString().equals(itemOwner)) {
+                player.sendMessage("§cThis Tracking Arrow belongs to another player's bounty contract.");
+                return;
+            }
             Contract c = active.get(player.getUniqueId());
             if (c == null || c.target == null) { player.sendMessage("§cThis Tracking Arrow has no active bounty target."); return; }
             Entity target = Bukkit.getEntity(c.target);
@@ -266,6 +271,14 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
         Contract c=active.remove(owner);
         if(c==null)return;
         Entity target=c.target==null?null:Bukkit.getEntity(c.target);
+        if (target == null && c.target != null && c.world != null) {
+            World targetWorld = Bukkit.getWorld(c.world);
+            if (targetWorld != null) {
+                Location targetLocation = new Location(targetWorld, c.x, c.y, c.z);
+                targetWorld.getChunkAt(targetLocation);
+                target = Bukkit.getEntity(c.target);
+            }
+        }
         if(target!=null) target.remove();
         Player p=Bukkit.getPlayer(owner);
         if(p!=null) {
