@@ -71,8 +71,8 @@ public final class BountyHuntManager implements Listener {
         if (tier != null) {
             event.setCancelled(true);
             if (active.containsKey(player.getUniqueId())) { player.sendMessage("§cYou already have an active bounty contract."); return; }
-            int hotbarSlots = countHotbarItems(player.getInventory());
-            if (hotbarSlots < 3) { player.sendMessage("§cBounty cancelled: keep at least 3 hotbar slots available for the map and mission equipment."); return; }
+            int emptyHotbarSlots = countEmptyHotbarSlots(player.getInventory());
+            if (emptyHotbarSlots < 1) { player.sendMessage("§cBounty cancelled: keep at least 3 hotbar slots available for the map and mission equipment."); return; }
             int slot = player.getInventory().getHeldItemSlot();
             if (hand.getAmount() > 1) hand.setAmount(hand.getAmount() - 1);
             else player.getInventory().setItem(slot, null);
@@ -106,9 +106,9 @@ public final class BountyHuntManager implements Listener {
         }
     }
 
-    private int countHotbarItems(PlayerInventory inv) {
+    private int countEmptyHotbarSlots(PlayerInventory inv) {
         int count=0;
-        for (int i=0;i<9;i++) if (inv.getItem(i)!=null && !inv.getItem(i).getType().isAir()) count++;
+        for (int i=0;i<9;i++) if (inv.getItem(i)==null || inv.getItem(i).getType().isAir()) count++;
         return count;
     }
 
