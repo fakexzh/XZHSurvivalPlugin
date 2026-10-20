@@ -97,7 +97,11 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
             event.setCancelled(true);
             if (active.containsKey(player.getUniqueId())) { player.sendMessage("§cYou already have an active bounty contract."); return; }
             int emptyHotbarSlots = countEmptyHotbarSlots(player.getInventory());
-            if (emptyHotbarSlots < 1) { player.sendMessage("§cBounty cancelled: keep at least one other hotbar slot empty for mission equipment."); return; }
+            int neededEmptySlots = hand.getAmount() > 1 ? 2 : 1;
+            if (emptyHotbarSlots < neededEmptySlots) {
+                player.sendMessage("§cBounty map not used: keep enough empty hotbar slots for both the Hunter's Bow and Tracking Arrow.");
+                return;
+            }
             int slot = player.getInventory().getHeldItemSlot();
             if (hand.getAmount() > 1) hand.setAmount(hand.getAmount() - 1);
             else player.getInventory().setItem(slot, null);
@@ -163,9 +167,21 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
         am.getPersistentDataContainer().set(arrowKey, PersistentDataType.BYTE, (byte)1);
         am.getPersistentDataContainer().set(contractOwnerKey, PersistentDataType.STRING, c.owner.toString());
         arrow.setItemMeta(am);
-        int mapSlot = inv.getHeldItemSlot();
-        inv.setItem(mapSlot, bow);
-        for (int i=0;i<9;i++) if (inv.getItem(i)==null || inv.getItem(i).getType().isAir()) { inv.setItem(i,arrow); break; }
+        int bowSlot = -1;
+        int arrowSlot = -1;
+        for (int i = 0; i < 9; i++) {
+            ItemStack current = inv.getItem(i);
+            if (current == null || current.getType().isAir()) {
+                if (bowSlot < 0) bowSlot = i;
+                else { arrowSlot = i; break; }
+            }
+        }
+        if (bowSlot < 0 || arrowSlot < 0) {
+            player.sendMessage("§cNot enough empty hotbar slots for mission equipment. Keep the map and both equipment slots clear.");
+            return;
+        }
+        inv.setItem(bowSlot, bow);
+        inv.setItem(arrowSlot, arrow);
         player.updateInventory();
     }
 
