@@ -131,25 +131,6 @@ public final class SurvivalFeatureManager implements Listener {
         applyMonsterProgression(monster, level);
     }
 
-    @EventHandler(ignoreCancelled = true)
-    public void onMobDamaged(EntityDamageByEntityEvent event) {
-        if (!plugin.getConfig().getBoolean("combat-indicators.damage-numbers-enabled", true)) return;
-        if (!(event.getEntity() instanceof LivingEntity victim)
-                || victim instanceof Player || victim instanceof ArmorStand) return;
-
-        Entity damager = event.getDamager();
-        if (damager instanceof Projectile projectile && projectile.getShooter() instanceof Entity shooter) {
-            damager = shooter;
-        }
-        if (!(damager instanceof Player)) return;
-
-        double damage = event.getFinalDamage();
-        if (damage <= 0.0) return;
-        Location location = victim.getLocation().add(0.0, Math.max(0.8, victim.getHeight() * 0.7), 0.0);
-        World world = victim.getWorld();
-        Bukkit.getScheduler().runTask(plugin, () -> spawnDamageNumber(world, location, damage));
-    }
-
     private void tick() {
         for (Player player : Bukkit.getOnlinePlayers()) {
             // Vanilla's persisted play-time statistic survives reconnects and server restarts.
@@ -468,38 +449,6 @@ public final class SurvivalFeatureManager implements Listener {
         TextDisplay display = healthDisplays.remove(playerId);
         healthTargets.remove(playerId);
         if (display != null && display.isValid()) display.remove();
-    }
-
-    private void spawnDamageNumber(World world, Location location, double damage) {
-        if (!plugin.getConfig().getBoolean("combat-indicators.damage-numbers-enabled", true)) return;
-        TextDisplay display = world.spawn(location, TextDisplay.class);
-        display.setText("§f" + formatDamage(damage));
-        display.setBillboard(Display.Billboard.CENTER);
-        display.setSeeThrough(true);
-        display.setShadowed(false);
-        display.setDefaultBackground(false);
-        display.setBackgroundColor(Color.fromARGB(0, 0, 0, 0));
-        display.setAlignment(TextDisplay.TextAlignment.CENTER);
-        display.setViewRange(0.8f);
-        display.setPersistent(false);
-        world.spawnParticle(Particle.CRIT, location, 3, 0.15, 0.15, 0.15, 0.02);
-        new BukkitRunnable() {
-            private int ticks;
-            @Override
-            public void run() {
-                if (!display.isValid() || ticks++ >= 12) {
-                    display.remove();
-                    cancel();
-                    return;
-                }
-                display.teleport(display.getLocation().add(0.0, 0.035, 0.0));
-            }
-        }.runTaskTimer(plugin, 1L, 1L);
-    }
-
-    private String formatDamage(double damage) {
-        String value = String.format(Locale.ROOT, "%.1f", damage);
-        return value.endsWith(".0") ? value.substring(0, value.length() - 2) : value;
     }
 
     private void loadPlaytime() {
