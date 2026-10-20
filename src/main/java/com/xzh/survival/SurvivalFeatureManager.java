@@ -183,7 +183,20 @@ public final class SurvivalFeatureManager implements Listener {
         // The header/footer stay clean and show this viewer's own level and saved all-time playtime.
         player.setPlayerListHeaderFooter(
                 "§d§lXZH SURVIVAL\n§8━━━━━━━━━━━━━━━━",
-                "\n§6Monster Level: §d" + level + "§8/§d100 §8| §bPlay Time: §f" + formatPlaytime(lifetimeSeconds));
+                "\n§6Monster Level: §d" + level + "§8/§d100 §8| §bPlay Time: §f" + formatPlaytime(lifetimeSeconds) + globalQuestFooter());
+    }
+
+    private String globalQuestFooter() {
+        org.bukkit.plugin.Plugin economy = Bukkit.getPluginManager().getPlugin("XZHEconomySystem");
+        if (economy == null || !economy.isEnabled()) return "";
+        try {
+            Object manager = economy.getClass().getMethod("getQuestManager").invoke(economy);
+            if (manager == null) return "";
+            Object status = manager.getClass().getMethod("getGlobalQuestTabText").invoke(manager);
+            return status instanceof String text ? "\n" + text : "";
+        } catch (ReflectiveOperationException ignored) {
+            return "";
+        }
     }
 
     private void refreshAllTabs() {
