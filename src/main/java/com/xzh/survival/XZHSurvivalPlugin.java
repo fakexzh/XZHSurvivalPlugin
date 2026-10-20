@@ -132,7 +132,12 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
             int amount = entry.getValue();
             while (amount > 0) {
                 int stack = Math.min(amount, entry.getKey().getMaxStackSize());
-                player.getInventory().addItem(new ItemStack(entry.getKey(), stack));
+                Map<Integer, ItemStack> leftovers = player.getInventory().addItem(
+                        new ItemStack(entry.getKey(), stack));
+                // Never silently delete logs if the inventory changed after the space check.
+                for (ItemStack leftover : leftovers.values()) {
+                    player.getWorld().dropItemNaturally(player.getLocation(), leftover);
+                }
                 amount -= stack;
             }
         }
@@ -211,17 +216,20 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
     }
 
     private boolean hasInventorySpace(PlayerInventory inventory, Map<Material, Integer> totals) {
+        // Simulate adding every wood type to the same temporary inventory. Checking
+        // each material independently can incorrectly count the same empty slots
+        // several times for mixed-wood trees.
+        org.bukkit.inventory.Inventory simulation = Bukkit.createInventory(null, 36);
+        simulation.setStorageContents(inventory.getStorageContents());
         for (Map.Entry<Material, Integer> entry : totals.entrySet()) {
-            int remaining = entry.getValue();
-            for (ItemStack item : inventory.getStorageContents()) {
-                if (item == null || item.getType().isAir()) {
-                    remaining -= entry.getKey().getMaxStackSize();
-                } else if (item.getType() == entry.getKey()) {
-                    remaining -= Math.max(0, item.getMaxStackSize() - item.getAmount());
+            int amount = entry.getValue();
+            while (amount > 0) {
+                int stack = Math.min(amount, entry.getKey().getMaxStackSize());
+                if (!simulation.addItem(new ItemStack(entry.getKey(), stack)).isEmpty()) {
+                    return false;
                 }
-                if (remaining <= 0) break;
+                amount -= stack;
             }
-            if (remaining > 0) return false;
         }
         return true;
     }
