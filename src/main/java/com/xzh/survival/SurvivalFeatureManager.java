@@ -116,6 +116,13 @@ public final class SurvivalFeatureManager implements Listener {
     }
 
     @EventHandler(ignoreCancelled = true)
+    public void onNautilusNaturalSpawn(CreatureSpawnEvent event) {
+        if (event.getEntityType() != org.bukkit.entity.EntityType.NAUTILUS) return;
+        CreatureSpawnEvent.SpawnReason reason = event.getSpawnReason();
+        if (reason == CreatureSpawnEvent.SpawnReason.NATURAL || reason == CreatureSpawnEvent.SpawnReason.CHUNK_GEN) event.setCancelled(true);
+    }
+
+    @EventHandler(ignoreCancelled = true)
     public void onCreatureSpawn(CreatureSpawnEvent event) {
         if (!plugin.getConfig().getBoolean("mob-progression.enabled", true)) return;
         if (!(event.getEntity() instanceof Monster monster)) return;
