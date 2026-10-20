@@ -195,7 +195,7 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
             if (surfaceY <= world.getMinHeight() + 3 || surfaceY >= world.getMaxHeight() - 3) continue;
             Material surfaceType = world.getBlockAt(x, surfaceY, z).getType();
             Material groundType = world.getBlockAt(x, surfaceY - 2, z).getType();
-            if (!surfaceType.isSolid() || surfaceType.isLiquid() || surfaceType.name().contains("LEAVES")
+            if (!surfaceType.isSolid() || surfaceType.name().contains("LEAVES")
                     || !groundType.isSolid()) continue;
             Location candidate = new Location(world, x, surfaceY - 1, z);
             if (candidate.getBlock().getType() == Material.BEDROCK
