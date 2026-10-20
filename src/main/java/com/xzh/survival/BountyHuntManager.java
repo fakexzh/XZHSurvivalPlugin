@@ -122,7 +122,7 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
                 player.sendMessage("§cThis is a " + dimension + " bounty map. Travel to the " + dimension + " before activating it. Your map was not consumed.");
                 return;
             }
-            String cooldownPath = "players." + player.getUniqueId() + "." + dimension + "." + tier;
+            String cooldownPath = "players." + player.getUniqueId() + "." + tier;
             long cooldownLeft = cooldownData.getLong(cooldownPath, 0L) - System.currentTimeMillis();
             if (cooldownLeft > 0L) {
                 long hours = cooldownLeft / 3_600_000L;
@@ -155,7 +155,7 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
             spawnTarget(player, c);
             player.sendMessage("§d§lXZH BOUNTY HUNT");
             player.sendMessage("§a✦ " + tier.toUpperCase(Locale.ROOT) + " " + dimension.toUpperCase(Locale.ROOT) + " bounty accepted!");
-            player.sendMessage("§7This bounty type is now on cooldown for 12 hours.");
+            player.sendMessage("§7This tier is now on cooldown for 12 hours across both dimensions.");
             player.sendMessage("§e➤ Hold your Tracking Arrow and right-click to locate your bounty target.");
             player.sendMessage("§e➤ You can use the special Hunter's Bow to fight and defeat your target.");
             player.sendMessage("§7➤ Your mission equipment will be removed when the contract ends.");
