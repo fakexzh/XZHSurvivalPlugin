@@ -19,6 +19,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.world.WorldLoadEvent;
 import org.bukkit.event.weather.WeatherChangeEvent;
 import org.bukkit.inventory.EquipmentSlot;
@@ -43,6 +44,7 @@ public final class RoamingBossManager implements Listener {
     private final NamespacedKey sealKey;
     private final Random random = new Random();
     private final Map<UUID, BossState> bosses = new HashMap<>();
+    private final Map<UUID, Location> lastSpawnCheckLocation = new HashMap<>();
     private long ticks;
 
     private static final class BossState {
@@ -101,6 +103,10 @@ public final class RoamingBossManager implements Listener {
         if (!plugin.getConfig().getBoolean("roaming-bosses.enabled", true)) return;
         if (ticks % 30 != 0 || bosses.size() >= 3) return;
         for (Player player : Bukkit.getOnlinePlayers()) {
+            Location current = player.getLocation();
+            Location previous = lastSpawnCheckLocation.put(player.getUniqueId(), current.clone());
+            if (previous == null || previous.getWorld() != current.getWorld()
+                    || previous.distanceSquared(current) < 100.0) continue; // Must have explored at least 10 blocks since the previous check.
             if (player.getWorld().getEnvironment() != World.Environment.NORMAL) continue;
             if (hasBossInWorld(player.getWorld())) continue;
             if (random.nextDouble() > plugin.getConfig().getDouble("roaming-bosses.spawn-chance-per-check", 0.035)) continue;
@@ -222,6 +228,11 @@ public final class RoamingBossManager implements Listener {
             plugin.getLogger().warning("Could not deposit roaming boss reward: " + ex.getClass().getSimpleName());
             return false;
         }
+    }
+
+    @EventHandler
+    public void onPlayerQuit(PlayerQuitEvent event) {
+        lastSpawnCheckLocation.remove(event.getPlayer().getUniqueId());
     }
 
     @EventHandler
