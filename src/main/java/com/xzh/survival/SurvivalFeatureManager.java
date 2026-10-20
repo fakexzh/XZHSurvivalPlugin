@@ -193,7 +193,7 @@ public final class SurvivalFeatureManager implements Listener {
             Object manager = economy.getClass().getMethod("getQuestManager").invoke(economy);
             if (manager == null) return "";
             Object status = manager.getClass().getMethod("getGlobalQuestTabText").invoke(manager);
-            return status instanceof String text ? "\n" + text : "";
+            return status instanceof String text ? "\n§8━━━━━━━━━━━━━━━━\n" + text : "";
         } catch (ReflectiveOperationException ignored) {
             return "";
         }
