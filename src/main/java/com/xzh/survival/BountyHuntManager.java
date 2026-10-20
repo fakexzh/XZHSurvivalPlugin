@@ -32,7 +32,7 @@ import java.util.*;
 
 public final class BountyHuntManager implements Listener, org.bukkit.command.CommandExecutor {
     private final JavaPlugin plugin;
-    private final NamespacedKey bountyTierKey, contractOwnerKey, bowKey, arrowKey, targetKey;
+    private final NamespacedKey bountyTierKey, contractOwnerKey, bowKey, arrowKey, targetKey, trackingCompassKey;
     private final File dataFile;
     private final org.bukkit.configuration.file.YamlConfiguration data = new org.bukkit.configuration.file.YamlConfiguration();
     private final Map<UUID, Contract> active = new HashMap<>();
@@ -54,6 +54,7 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
         contractOwnerKey = new NamespacedKey(plugin, "bounty_owner");
         bowKey = new NamespacedKey(plugin, "hunter_bow");
         arrowKey = new NamespacedKey(plugin, "tracking_arrow");
+        trackingCompassKey = new NamespacedKey(plugin, "tracking_compass");
         targetKey = new NamespacedKey(plugin, "bounty_target");
         dataFile = new File(plugin.getDataFolder(), "bounties.yml");
     }
@@ -118,7 +119,7 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
             event.setCancelled(true);
             if (active.containsKey(player.getUniqueId())) { player.sendMessage("§cYou already have an active bounty contract."); return; }
             int emptyHotbarSlots = countEmptyHotbarSlots(player.getInventory());
-            int neededEmptySlots = hand.getAmount() > 1 ? 2 : 1;
+            int neededEmptySlots = hand.getAmount() > 1 ? 3 : 2;
             if (emptyHotbarSlots < neededEmptySlots) {
                 player.sendMessage("§cBounty map not used: keep enough empty hotbar slots for both the Hunter's Bow and Tracking Arrow.");
                 return;
@@ -273,21 +274,31 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
         am.getPersistentDataContainer().set(arrowKey, PersistentDataType.BYTE, (byte)1);
         am.getPersistentDataContainer().set(contractOwnerKey, PersistentDataType.STRING, c.owner.toString());
         arrow.setItemMeta(am);
+        ItemStack compass = new ItemStack(Material.COMPASS);
+        ItemMeta cm = compass.getItemMeta();
+        cm.setDisplayName("§dBounty Tracker");
+        cm.setLore(List.of("§7Live direction and distance to your target."));
+        cm.getPersistentDataContainer().set(trackingCompassKey, PersistentDataType.BYTE, (byte)1);
+        cm.getPersistentDataContainer().set(contractOwnerKey, PersistentDataType.STRING, c.owner.toString());
+        compass.setItemMeta(cm);
         int bowSlot = -1;
         int arrowSlot = -1;
+        int compassSlot = -1;
         for (int i = 0; i < 9; i++) {
             ItemStack current = inv.getItem(i);
             if (current == null || current.getType().isAir()) {
                 if (bowSlot < 0) bowSlot = i;
-                else { arrowSlot = i; break; }
+                else if (arrowSlot < 0) arrowSlot = i;
+                else { compassSlot = i; break; }
             }
         }
-        if (bowSlot < 0 || arrowSlot < 0) {
-            player.sendMessage("§cNot enough empty hotbar slots for mission equipment. Keep the map and both equipment slots clear.");
+        if (bowSlot < 0 || arrowSlot < 0 || compassSlot < 0) {
+            player.sendMessage("§cNot enough empty hotbar slots for the bow, arrows and tracker compass.");
             return;
         }
         inv.setItem(bowSlot, bow);
-        inv.setItem(arrowSlot, arrow);
+        inv.setItem(arrowSlot, new ItemStack(Material.ARROW, 16));
+        inv.setItem(compassSlot, compass);
         player.updateInventory();
     }
 
@@ -386,8 +397,18 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
             if(p==null || !p.isOnline()) continue;
             c.remainingSeconds--;
             Entity activeTarget = c.target == null ? null : Bukkit.getEntity(c.target);
-            if (activeTarget instanceof LivingEntity living && !living.isDead()) refreshContractBossBar(c, living);
-            else removeContractBossBar(c.owner);
+            if (activeTarget instanceof LivingEntity living && !living.isDead()) {
+                refreshContractBossBar(c, living);
+                if (p.getWorld() == living.getWorld()) {
+                    p.setCompassTarget(living.getLocation());
+                    double dx = living.getLocation().getX() - p.getLocation().getX();
+                    double dz = living.getLocation().getZ() - p.getLocation().getZ();
+                    double angle = (Math.toDegrees(Math.atan2(-dx, dz)) + 360.0) % 360.0;
+                    String[] dirs = {"N","NE","E","SE","S","SW","W","NW"};
+                    String dir = dirs[(int)Math.round(angle / 45.0) % 8];
+                    p.sendActionBar("§dBounty §8• §f" + dir + " §7| §e" + (int)p.getLocation().distance(living.getLocation()) + " blocks §8| §7" + format(c.remainingSeconds));
+                }
+            } else removeContractBossBar(c.owner);
             if(c.remainingSeconds<=0) {
                 p.sendMessage("§cBounty failed: your contract timer expired.");
                 finish(c.owner,"expired");
