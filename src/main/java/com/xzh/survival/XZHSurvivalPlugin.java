@@ -41,6 +41,7 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
     private AdventureLootManager adventureLootManager;
     private DynamicTradingManager dynamicTradingManager;
     private FarmingManager farmingManager;
+    private BountyHuntManager bountyHuntManager;
 
     @Override
     public void onEnable() {
@@ -56,6 +57,8 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         dynamicTradingManager.start();
         farmingManager = new FarmingManager(this);
         farmingManager.start();
+        bountyHuntManager = new BountyHuntManager(this);
+        bountyHuntManager.start();
         getLogger().info("XZH Survival Plugin enabled.");
     }
 
@@ -63,6 +66,7 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
     public void onDisable() {
         if (customTimeManager != null) customTimeManager.shutdown();
         if (survivalFeatureManager != null) survivalFeatureManager.shutdown();
+        if (bountyHuntManager != null) bountyHuntManager.shutdown();
     }
 
     @EventHandler(ignoreCancelled = true)
