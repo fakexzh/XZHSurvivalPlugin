@@ -381,7 +381,7 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
         if (c==null || !event.getEntity().getUniqueId().equals(c.target)) return;
         Player owner=Bukkit.getPlayer(ownerId);
         int defaultReward=c.tier.equals("legendary")?900:c.tier.equals("rare")?500:200;
-        int reward=(int)Math.ceil(Math.max(c.entryPrice, defaultReward / 1.6) * (1.0 + c.rewardPercent / 100.0));
+        int reward=(int)Math.ceil(c.entryPrice * (1.0 + c.rewardPercent / 100.0));
         boolean paid = payReward(ownerId,reward);
         if (owner!=null) owner.sendMessage(paid
                 ? "§a§lBOUNTY COMPLETE! §fReward: §e"+reward+" coins §fdeposited directly into your bank."
