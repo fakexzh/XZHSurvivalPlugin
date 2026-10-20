@@ -38,6 +38,8 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
     private final Map<UUID, Contract> active = new HashMap<>();
     private final Map<UUID, BossBar> contractBossBars = new HashMap<>();
     private final Map<UUID, Location> activeTreasures = new HashMap<>();
+    private final Map<UUID, Integer> treasureRewards = new HashMap<>();
+    private final Map<UUID, Long> treasureTimers = new HashMap<>();
     private final Random random = new Random();
 
     private static final class Contract {
@@ -213,6 +215,15 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
         }
         activeTreasures.put(player.getUniqueId(), chestLocation.clone());
         player.setCompassTarget(chestLocation);
+        ItemMeta missionMeta = map.getItemMeta();
+        String treasureTier = missionMeta == null ? "common" : missionMeta.getPersistentDataContainer().get(new NamespacedKey("xzheconomysystem", "treasure_hunt_tier"), PersistentDataType.STRING);
+        if (treasureTier == null) treasureTier = "common";
+        Double missionPrice = missionMeta == null ? null : missionMeta.getPersistentDataContainer().get(new NamespacedKey("xzheconomysystem", "mission_entry_price"), PersistentDataType.DOUBLE);
+        double entryPrice = missionPrice == null || missionPrice <= 0 ? (treasureTier.equals("legendary") ? 800 : treasureTier.equals("rare") ? 450 : 250) : missionPrice;
+        int rewardPercent = 30 + random.nextInt(31);
+        treasureRewards.put(player.getUniqueId(), (int)Math.ceil(entryPrice * (1.0 + rewardPercent / 100.0)));
+        long missionSeconds = treasureTier.equals("legendary") ? 7200L : treasureTier.equals("rare") ? 2700L : 1500L;
+        treasureTimers.put(player.getUniqueId(), missionSeconds);
         // Treasure hunts are map-and-travel missions; never throw an Eye of Ender.
         if (map.getAmount() <= 1) {
             if (handSlot == org.bukkit.inventory.EquipmentSlot.OFF_HAND) player.getInventory().setItemInOffHand(null);
@@ -220,8 +231,9 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
         } else map.setAmount(map.getAmount() - 1);
         player.updateInventory();
         player.sendMessage("§6§lXZH TREASURE HUNT");
-        player.sendMessage("§fTravel to the map location marked X. The chest is placed on the surface at the destination.");
-        player.sendActionBar("§6Treasure located §8• §f" + (int)player.getLocation().distance(chestLocation) + " blocks away");
+        player.sendMessage("§fTravel to the map location marked X and open the chest.");
+        player.sendMessage("§7Time limit: " + format(missionSeconds) + ". Hidden reward; possible profit bonus: §e30–60%§7.");
+        player.sendActionBar("§6Treasure §8• §f" + (int)player.getLocation().distance(chestLocation) + " blocks away");
     }
 
     @EventHandler(ignoreCancelled = true)
@@ -239,8 +251,13 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
             }
         }
         if (foundOwner == null) return;
+        if (!player.getUniqueId().equals(foundOwner)) { event.setCancelled(true); player.sendMessage("§cThis treasure belongs to another hunter."); return; }
         activeTreasures.remove(foundOwner);
-        player.sendMessage("§a§lTREASURE FOUND! §fThe buried chest is yours to loot.");
+        treasureTimers.remove(foundOwner);
+        int reward = treasureRewards.getOrDefault(foundOwner, 0);
+        treasureRewards.remove(foundOwner);
+        boolean paid = reward > 0 && payReward(foundOwner, reward);
+        player.sendMessage(paid ? "§a§lTREASURE FOUND! §fHidden reward: §e" + reward + " coins §fdeposited into your bank." : "§a§lTREASURE FOUND! §fCollect your loot from the chest.");
         Player owner = Bukkit.getPlayer(foundOwner);
         if (owner != null && !owner.getUniqueId().equals(player.getUniqueId())) {
             owner.sendMessage("§cYour treasure chest was found by " + player.getName() + ".");
@@ -361,7 +378,7 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
         if (c==null || !event.getEntity().getUniqueId().equals(c.target)) return;
         Player owner=Bukkit.getPlayer(ownerId);
         int defaultReward=c.tier.equals("legendary")?900:c.tier.equals("rare")?500:200;
-        int reward=plugin.getConfig().getInt("bounty-hunt.rewards."+c.tier,defaultReward);
+        int reward=(int)Math.ceil(Math.max(c.entryPrice, defaultReward / 1.6) * (1.0 + c.rewardPercent / 100.0));
         boolean paid = payReward(ownerId,reward);
         if (owner!=null) owner.sendMessage(paid
                 ? "§a§lBOUNTY COMPLETE! §fReward: §e"+reward+" coins §fdeposited directly into your bank."
@@ -392,6 +409,28 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
     }
 
     private void tick() {
+        for (UUID owner : new ArrayList<>(treasureTimers.keySet())) {
+            long left = treasureTimers.getOrDefault(owner, 0L) - 1L;
+            Player hunter = Bukkit.getPlayer(owner);
+            Location destination = activeTreasures.get(owner);
+            if (left <= 0) {
+                treasureTimers.remove(owner); treasureRewards.remove(owner);
+                activeTreasures.remove(owner);
+                if (destination != null && destination.getBlock().getType() == Material.CHEST) destination.getBlock().setType(Material.AIR, false);
+                if (hunter != null) hunter.sendMessage("§cTreasure hunt expired. The mission chest has been cleared.");
+            } else {
+                treasureTimers.put(owner, left);
+                if (hunter != null && destination != null && hunter.getWorld() == destination.getWorld()) {
+                    hunter.setCompassTarget(destination);
+                    double dx = destination.getX() - hunter.getLocation().getX();
+                    double dz = destination.getZ() - hunter.getLocation().getZ();
+                    double angle = (Math.toDegrees(Math.atan2(-dx, dz)) + 360.0) % 360.0;
+                    String[] dirs = {"N","NE","E","SE","S","SW","W","NW"};
+                    hunter.sendActionBar("§6Treasure §8• §f" + dirs[(int)Math.round(angle / 45.0) % 8] + " §7| §e" + (int)hunter.getLocation().distance(destination) + " blocks §8| §7" + format(left));
+                    if (left % 60 == 0) hunter.sendMessage("§6Treasure time remaining: §f" + format(left));
+                }
+            }
+        }
         for (Contract c:new ArrayList<>(active.values())) {
             Player p=Bukkit.getPlayer(c.owner);
             if(p==null || !p.isOnline()) continue;
@@ -512,7 +551,7 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
             String k=c.owner.toString();
             data.set(k+".tier",c.tier); data.set(k+".target",c.target==null?null:c.target.toString());
             data.set(k+".world",c.world); data.set(k+".x",c.x); data.set(k+".y",c.y); data.set(k+".z",c.z);
-            data.set(k+".remaining",c.remainingSeconds);
+            data.set(k+".remaining",c.remainingSeconds); data.set(k+".entryPrice",c.entryPrice); data.set(k+".rewardPercent",c.rewardPercent);
         }
         try { data.save(dataFile); } catch(IOException e) { plugin.getLogger().warning("Could not save bounty data: "+e.getMessage()); }
     }
@@ -527,6 +566,8 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
                 Contract c=new Contract(owner,tier,data.getLong(key+".remaining",0));
                 String target=data.getString(key+".target"); if(target!=null)c.target=UUID.fromString(target);
                 c.world=data.getString(key+".world"); c.x=data.getDouble(key+".x"); c.y=data.getDouble(key+".y"); c.z=data.getDouble(key+".z");
+                c.entryPrice=data.getDouble(key+".entryPrice", c.tier.equals("legendary") ? 600 : c.tier.equals("rare") ? 300 : 100);
+                c.rewardPercent=data.getInt(key+".rewardPercent", 30 + random.nextInt(31));
                 if(c.remainingSeconds>0)active.put(owner,c);
             } catch(Exception ignored) {}
         }
