@@ -8,6 +8,9 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.world.TimeSkipEvent;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.util.ArrayList;
@@ -20,7 +23,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public final class CustomTimeManager implements CommandExecutor, TabCompleter {
+public final class CustomTimeManager implements CommandExecutor, TabCompleter, Listener {
     private static final long TICKS_PER_DAY_PHASE = 12_000L;
     private static final long MAX_DURATION_SECONDS = 7L * 24L * 60L * 60L;
     private static final Pattern DURATION_PATTERN = Pattern.compile("(?i)^(\\d+)(s|m|h|d)?$");
@@ -35,6 +38,7 @@ public final class CustomTimeManager implements CommandExecutor, TabCompleter {
     }
 
     public void start() {
+        Bukkit.getPluginManager().registerEvents(this, plugin);
         if (plugin.getCommand("customtime") != null) {
             plugin.getCommand("customtime").setExecutor(this);
             plugin.getCommand("customtime").setTabCompleter(this);
@@ -180,6 +184,26 @@ public final class CustomTimeManager implements CommandExecutor, TabCompleter {
             controlledWorlds.clear();
         }
         states.clear();
+    }
+
+    /**
+     * Keep the custom cycle in sync with vanilla's sleep-driven time skip.
+     * The custom ticker normally writes world time every tick, so without updating
+     * its phase state it immediately overwrites the time jump caused by sleeping.
+     */
+    @EventHandler(ignoreCancelled = true)
+    public void onTimeSkip(TimeSkipEvent event) {
+        World world = event.getWorld();
+        if (!isEnabled() || world.getEnvironment() != World.Environment.NORMAL
+                || !controlledWorlds.contains(world)) return;
+        if (event.getSkipReason() != TimeSkipEvent.SkipReason.NIGHT_SKIP) return;
+
+        CycleState state = states.get(world);
+        if (state == null) return;
+        state.day = true;
+        state.phaseStartMillis = System.currentTimeMillis();
+        // Set daytime immediately; subsequent custom ticks continue from the start of day.
+        world.setTime(0L);
     }
 
     private void tick() {
