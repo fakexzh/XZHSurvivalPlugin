@@ -173,7 +173,7 @@ public final class AdventureLootManager implements Listener {
     public void onBuriedTreasureLootGenerate(LootGenerateEvent event) {
         if (!plugin.getConfig().getBoolean("adventure-loot.enabled", true)) return;
         if (event.getLootTable() == null || event.getLootTable().getKey() == null
-                || !event.getLootTable().getKey().getKey().equals("buried_treasure")) return;
+                || !event.getLootTable().getKey().getKey().endsWith("buried_treasure")) return;
         // Add actual custom XZH coin items to the generated vanilla buried-treasure loot.
         ItemStack tenCoins = createOfficialCoin(10, 2 + random.nextInt(7));
         ItemStack singleCoins = createOfficialCoin(1, 10 + random.nextInt(21));
