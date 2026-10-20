@@ -133,7 +133,7 @@ public final class RoamingBossManager implements Listener {
             if (y < world.getMinHeight() + 2 || y >= world.getMaxHeight() - 2) continue;
             Location spawn = new Location(world, x + 0.5, y, z + 0.5);
             Material ground = world.getBlockAt(x, y - 1, z).getType();
-            if (!ground.isSolid() || ground.isLiquid() || !spawn.getBlock().isPassable()
+            if (!ground.isSolid() || !spawn.getBlock().isPassable()
                     || !spawn.clone().add(0, 1, 0).getBlock().isPassable()) continue;
             EntityType type = switch (random.nextInt(4)) {
                 case 0 -> EntityType.ZOMBIE;
