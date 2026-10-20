@@ -6,6 +6,7 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Particle;
+import org.bukkit.Statistic;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
@@ -70,7 +71,7 @@ public final class SurvivalFeatureManager implements Listener {
         loadPlaytime();
         Bukkit.getPluginManager().registerEvents(this, plugin);
         for (Player player : Bukkit.getOnlinePlayers()) {
-            playtimeSeconds.putIfAbsent(player.getUniqueId(), 0L);
+            syncLifetimePlaytime(player);
             hideOtherPlayersHealthDisplays(player);
             updateTab(player);
         }
@@ -94,7 +95,7 @@ public final class SurvivalFeatureManager implements Listener {
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
-        playtimeSeconds.putIfAbsent(player.getUniqueId(), 0L);
+        syncLifetimePlaytime(player);
         hideOtherPlayersHealthDisplays(player);
         updateTab(player);
         Bukkit.getScheduler().runTask(plugin, this::refreshAllTabs);
@@ -144,7 +145,9 @@ public final class SurvivalFeatureManager implements Listener {
 
     private void tick() {
         for (Player player : Bukkit.getOnlinePlayers()) {
-            playtimeSeconds.merge(player.getUniqueId(), 1L, Long::sum);
+            // Vanilla's persisted play-time statistic survives reconnects and server restarts.
+            // Keep our saved counter as a fallback, and never let lifetime playtime move backwards.
+            syncLifetimePlaytime(player);
             updateTab(player);
             updateTargetHealth(player);
         }
@@ -155,13 +158,20 @@ public final class SurvivalFeatureManager implements Listener {
         }
     }
 
+    private void syncLifetimePlaytime(Player player) {
+        UUID id = player.getUniqueId();
+        long savedSeconds = playtimeSeconds.getOrDefault(id, 0L);
+        long vanillaSeconds = Math.max(0L, player.getStatistic(Statistic.PLAY_ONE_MINUTE) / 20L);
+        playtimeSeconds.put(id, Math.max(savedSeconds, vanillaSeconds));
+    }
+
     private void updateTab(Player player) {
         int level = getMonsterLevel(player);
         int ping = Math.max(0, player.getPing());
         long lifetimeSeconds = playtimeSeconds.getOrDefault(player.getUniqueId(), 0L);
 
         // Keep each player row minimal: white username followed by a green numeric ping.
-        player.setPlayerListName("§f" + player.getName() + " §8| §a" + ping + "ms");
+        player.setPlayerListName("§f" + player.getName() + " §8| §e" + ping + "ms");
         // The header/footer stay clean and show this viewer's own level and saved all-time playtime.
         player.setPlayerListHeaderFooter(
                 "§d§lXZH SURVIVAL\n§8━━━━━━━━━━━━━━━━",
