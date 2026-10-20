@@ -151,15 +151,7 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
             Entity target = Bukkit.getEntity(c.target);
             if (target == null || target.isDead()) { player.sendMessage("§cYour target cannot be located. The contract will remain active until its timer expires."); return; }
             Location targetLocation = target.getLocation().clone();
-            // Spawn the same guided Eye-of-Ender entity players recognize, aimed at the live target.
-            try {
-                EnderSignal signal = player.getWorld().spawn(player.getEyeLocation(), EnderSignal.class);
-                signal.setTargetLocation(targetLocation);
-                signal.setDropItem(false);
-                signal.setDespawnTimer(80);
-            } catch (RuntimeException ex) {
-                plugin.getLogger().warning("Could not spawn bounty tracking Eye of Ender: " + ex.getClass().getSimpleName());
-            }
+            // Use compass/action-bar navigation for custom target tracking; no Eye of Ender is spawned.
             Vector direction = targetLocation.toVector().subtract(player.getLocation().toVector()).setY(0);
             if (direction.lengthSquared() > 0.01) {
                 float yaw = (float) Math.toDegrees(Math.atan2(-direction.getX(), direction.getZ()));
@@ -168,7 +160,7 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
             player.setCompassTarget(targetLocation);
             player.sendActionBar("§dBounty target §8• §f" + (int) player.getLocation().distance(targetLocation) + " blocks away");
             player.getWorld().spawnParticle(Particle.END_ROD, player.getEyeLocation().add(player.getEyeLocation().getDirection().multiply(1.2)), 8, 0.2, 0.2, 0.2, 0.02);
-            player.sendMessage("§dTracking Eye launched! Follow its direction and the compass bearing.");
+            player.sendMessage("§dTracking updated. Follow the bearing and distance above your hotbar.");
         }
     }
 
@@ -197,8 +189,9 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
             Material groundType = world.getBlockAt(x, surfaceY - 2, z).getType();
             if (!surfaceType.isSolid() || surfaceType.name().contains("LEAVES")
                     || !groundType.isSolid()) continue;
-            Location candidate = new Location(world, x, surfaceY - 1, z);
-            if (candidate.getBlock().getType() == Material.BEDROCK
+            Location candidate = new Location(world, x, surfaceY + 1, z);
+            if (!world.getBlockAt(x, surfaceY, z).getType().isSolid()
+                    || !candidate.getBlock().isPassable()
                     || candidate.getBlock().getType() == Material.CHEST) continue;
             chestLocation = candidate;
             break;
@@ -219,20 +212,14 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
         }
         activeTreasures.put(player.getUniqueId(), chestLocation.clone());
         player.setCompassTarget(chestLocation);
-        try {
-            EnderSignal signal = world.spawn(player.getEyeLocation(), EnderSignal.class);
-            signal.setTargetLocation(chestLocation);
-            signal.setDropItem(false);
-            signal.setDespawnTimer(80);
-        } catch (RuntimeException ex) {
-            plugin.getLogger().warning("Could not spawn treasure tracking Eye of Ender: " + ex.getClass().getSimpleName());
-        }
-        if (map.getAmount() <= 1) player.getInventory().setItemInMainHand(null);
-        else map.setAmount(map.getAmount() - 1);
+        // Treasure hunts are map-and-travel missions; never throw an Eye of Ender.
+        if (map.getAmount() <= 1) {
+            if (handSlot == org.bukkit.inventory.EquipmentSlot.OFF_HAND) player.getInventory().setItemInOffHand(null);
+            else player.getInventory().setItemInMainHand(null);
+        } else map.setAmount(map.getAmount() - 1);
         player.updateInventory();
         player.sendMessage("§6§lXZH TREASURE HUNT");
-        player.sendMessage("§eAn Eye of Ender has launched toward your buried treasure!");
-        player.sendMessage("§fFollow your compass. The chest is hidden one block below the surface.");
+        player.sendMessage("§fTravel to the map location marked X. The chest is placed on the surface at the destination.");
         player.sendActionBar("§6Treasure located §8• §f" + (int)player.getLocation().distance(chestLocation) + " blocks away");
     }
 
