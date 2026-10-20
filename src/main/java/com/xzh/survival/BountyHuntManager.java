@@ -3,6 +3,9 @@ package com.xzh.survival;
 import org.bukkit.*;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.entity.*;
+import org.bukkit.boss.BarColor;
+import org.bukkit.boss.BarStyle;
+import org.bukkit.boss.BossBar;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDeathEvent;
@@ -30,6 +33,7 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
     private final File dataFile;
     private final org.bukkit.configuration.file.YamlConfiguration data = new org.bukkit.configuration.file.YamlConfiguration();
     private final Map<UUID, Contract> active = new HashMap<>();
+    private final Map<UUID, BossBar> contractBossBars = new HashMap<>();
     private final Random random = new Random();
 
     private static final class Contract {
@@ -58,7 +62,11 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
         for (Contract c : active.values()) restoreTarget(c);
     }
 
-    public void shutdown() { save(); }
+    public void shutdown() {
+        save();
+        for (BossBar bar : contractBossBars.values()) bar.removeAll();
+        contractBossBars.clear();
+    }
 
     @Override
     public boolean onCommand(org.bukkit.command.CommandSender sender, org.bukkit.command.Command command,
@@ -129,15 +137,25 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
             if (c == null || c.target == null) { player.sendMessage("§cThis Tracking Arrow has no active bounty target."); return; }
             Entity target = Bukkit.getEntity(c.target);
             if (target == null || target.isDead()) { player.sendMessage("§cYour target cannot be located. The contract will remain active until its timer expires."); return; }
-            Vector direction = target.getLocation().toVector().subtract(player.getLocation().toVector()).setY(0);
+            Location targetLocation = target.getLocation().clone();
+            // Spawn the same guided Eye-of-Ender entity players recognize, aimed at the live target.
+            try {
+                EnderSignal signal = player.getWorld().spawn(player.getEyeLocation(), EnderSignal.class);
+                signal.setTargetLocation(targetLocation);
+                signal.setDropItem(false);
+                signal.setDespawnTimer(80);
+            } catch (RuntimeException ex) {
+                plugin.getLogger().warning("Could not spawn bounty tracking Eye of Ender: " + ex.getClass().getSimpleName());
+            }
+            Vector direction = targetLocation.toVector().subtract(player.getLocation().toVector()).setY(0);
             if (direction.lengthSquared() > 0.01) {
                 float yaw = (float) Math.toDegrees(Math.atan2(-direction.getX(), direction.getZ()));
                 player.setRotation(yaw, player.getLocation().getPitch());
             }
-            player.setCompassTarget(target.getLocation());
-            player.sendActionBar("§dBounty target direction §8• §f" + (int) player.getLocation().distance(target.getLocation()) + " blocks away");
+            player.setCompassTarget(targetLocation);
+            player.sendActionBar("§dBounty target §8• §f" + (int) player.getLocation().distance(targetLocation) + " blocks away");
             player.getWorld().spawnParticle(Particle.END_ROD, player.getEyeLocation().add(player.getEyeLocation().getDirection().multiply(1.2)), 8, 0.2, 0.2, 0.2, 0.02);
-            player.sendMessage("§dTracking pulse sent. Follow the direction shown above.");
+            player.sendMessage("§dTracking Eye launched! Follow its direction and the compass bearing.");
         }
     }
 
@@ -212,6 +230,7 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
         living.setGlowing(true);
         living.setCustomName("§d§l"+c.tier.toUpperCase(Locale.ROOT)+" BOUNTY TARGET");
         living.setCustomNameVisible(true);
+        refreshContractBossBar(c, living);
         living.getPersistentDataContainer().set(targetKey,PersistentDataType.STRING,c.owner.toString());
         if (living.getAttribute(Attribute.MAX_HEALTH)!=null) {
             double hp = c.tier.equals("legendary")?120:c.tier.equals("rare")?60:30;
@@ -278,6 +297,9 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
             Player p=Bukkit.getPlayer(c.owner);
             if(p==null || !p.isOnline()) continue;
             c.remainingSeconds--;
+            Entity activeTarget = c.target == null ? null : Bukkit.getEntity(c.target);
+            if (activeTarget instanceof LivingEntity living && !living.isDead()) refreshContractBossBar(c, living);
+            else removeContractBossBar(c.owner);
             if(c.remainingSeconds<=0) {
                 p.sendMessage("§cBounty failed: your contract timer expired.");
                 finish(c.owner,"expired");
@@ -287,8 +309,35 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
         }
     }
 
+    private void refreshContractBossBar(Contract contract, LivingEntity target) {
+        Player owner = Bukkit.getPlayer(contract.owner);
+        if (owner == null || !owner.isOnline()) return;
+        BossBar bar = contractBossBars.computeIfAbsent(contract.owner, id -> {
+            BossBar created = Bukkit.createBossBar("", BarColor.PURPLE, BarStyle.SEGMENTED_10);
+            created.setVisible(true);
+            return created;
+        });
+        double maxHealth = target.getAttribute(Attribute.MAX_HEALTH) == null
+                ? Math.max(1.0, target.getHealth())
+                : Math.max(1.0, target.getAttribute(Attribute.MAX_HEALTH).getValue());
+        bar.setTitle("§d§l" + contract.tier.toUpperCase(Locale.ROOT) + " BOUNTY §8• §f"
+                + (int)Math.ceil(target.getHealth()) + "/" + (int)Math.ceil(maxHealth) + " HP §8• §e" + format(contract.remainingSeconds));
+        bar.setProgress(Math.max(0.0, Math.min(1.0, target.getHealth() / maxHealth)));
+        if (!bar.getPlayers().contains(owner)) bar.addPlayer(owner);
+        bar.setVisible(true);
+    }
+
+    private void removeContractBossBar(UUID owner) {
+        BossBar bar = contractBossBars.remove(owner);
+        if (bar != null) {
+            bar.removeAll();
+            bar.setVisible(false);
+        }
+    }
+
     private void finish(UUID owner,String reason) {
         Contract c=active.remove(owner);
+        removeContractBossBar(owner);
         if(c==null)return;
         Entity target=c.target==null?null:Bukkit.getEntity(c.target);
         if (target == null && c.target != null && c.world != null) {
