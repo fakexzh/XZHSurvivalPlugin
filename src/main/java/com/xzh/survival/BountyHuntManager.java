@@ -35,16 +35,15 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
     private final NamespacedKey bountyTierKey, contractOwnerKey, bowKey, arrowKey, targetKey, trackingCompassKey;
     private final File dataFile;
     private final org.bukkit.configuration.file.YamlConfiguration data = new org.bukkit.configuration.file.YamlConfiguration();
+    private final File cooldownFile;
+    private final org.bukkit.configuration.file.YamlConfiguration cooldownData = new org.bukkit.configuration.file.YamlConfiguration();
     private final Map<UUID, Contract> active = new HashMap<>();
     private final Map<UUID, BossBar> contractBossBars = new HashMap<>();
-    private final Map<UUID, Location> activeTreasures = new HashMap<>();
-    private final Map<UUID, Integer> treasureRewards = new HashMap<>();
-    private final Map<UUID, Long> treasureTimers = new HashMap<>();
     private final Random random = new Random();
 
     private static final class Contract {
         UUID owner, target;
-        String tier, world;
+        String tier, world, dimension;
         double x, y, z, entryPrice;
         int rewardPercent;
         long remainingSeconds, lastSavedAt;
@@ -60,10 +59,12 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
         trackingCompassKey = new NamespacedKey(plugin, "tracking_compass");
         targetKey = new NamespacedKey(plugin, "bounty_target");
         dataFile = new File(plugin.getDataFolder(), "bounties.yml");
+        cooldownFile = new File(plugin.getDataFolder(), "bounty-cooldowns.yml");
     }
 
     public void start() {
         load();
+        loadCooldowns();
         Bukkit.getPluginManager().registerEvents(this, plugin);
         Bukkit.getScheduler().runTaskTimer(plugin, this::tick, 20L, 20L);
         Bukkit.getScheduler().runTaskTimer(plugin, this::save, 100L, 100L);
@@ -72,6 +73,7 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
 
     public void shutdown() {
         save();
+        saveCooldowns();
         for (BossBar bar : contractBossBars.values()) bar.removeAll();
         contractBossBars.clear();
     }
@@ -102,15 +104,6 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
         ItemStack hand = event.getItem();
         if (hand == null || !hand.hasItemMeta()) return;
         ItemMeta meta = hand.getItemMeta();
-        boolean treasureMap = meta.getPersistentDataContainer().getKeys().stream()
-                .anyMatch(key -> key.getNamespace().equals("xzheconomysystem")
-                        && key.getKey().equals("treasure_hunt_map")
-                        && meta.getPersistentDataContainer().has(key, PersistentDataType.BYTE));
-        if (treasureMap) {
-            event.setCancelled(true);
-            startTreasureHunt(player, hand, event.getHand());
-            return;
-        }
         String tier = null;
         for (NamespacedKey key : meta.getPersistentDataContainer().getKeys()) {
             if (key.getNamespace().equals("xzheconomysystem") && key.getKey().equals("bounty_tier")) {
@@ -120,6 +113,24 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
         }
         if (tier != null) {
             event.setCancelled(true);
+            String dimension = meta.getPersistentDataContainer().get(new NamespacedKey("xzheconomysystem", "bounty_dimension"), PersistentDataType.STRING);
+            if (dimension == null) dimension = "overworld";
+            dimension = dimension.toLowerCase(Locale.ROOT);
+            if (!dimension.equals("overworld") && !dimension.equals("nether")) { player.sendMessage("§cThis bounty map has an invalid dimension."); return; }
+            World.Environment requiredEnvironment = dimension.equals("nether") ? World.Environment.NETHER : World.Environment.NORMAL;
+            if (player.getWorld().getEnvironment() != requiredEnvironment) {
+                player.sendMessage("§cThis is a " + dimension + " bounty map. Travel to the " + dimension + " before activating it. Your map was not consumed.");
+                return;
+            }
+            String cooldownPath = "players." + player.getUniqueId() + "." + dimension + "." + tier;
+            long cooldownLeft = cooldownData.getLong(cooldownPath, 0L) - System.currentTimeMillis();
+            if (cooldownLeft > 0L) {
+                long hours = cooldownLeft / 3_600_000L;
+                long minutes = (cooldownLeft % 3_600_000L + 59_999L) / 60_000L;
+                player.sendMessage("§c" + tier.toUpperCase(Locale.ROOT) + " " + dimension.toUpperCase(Locale.ROOT)
+                        + " bounty cooldown: " + hours + "h " + minutes + "m remaining. Your map was not consumed.");
+                return;
+            }
             if (active.containsKey(player.getUniqueId())) { player.sendMessage("§cYou already have an active bounty contract."); return; }
             int emptyHotbarSlots = countEmptyHotbarSlots(player.getInventory());
             int neededEmptySlots = hand.getAmount() > 1 ? 3 : 2;
@@ -134,13 +145,17 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
             long defaultSeconds = tier.equals("common") ? 25*60L : tier.equals("rare") ? 45*60L : 2*60*60L;
             long seconds = plugin.getConfig().getLong("bounty-hunt.timers-seconds." + tier, defaultSeconds);
             Contract c = new Contract(player.getUniqueId(), tier, seconds);
+            c.dimension = dimension;
             Double mapPrice = meta.getPersistentDataContainer().get(new NamespacedKey("xzheconomysystem", "mission_entry_price"), PersistentDataType.DOUBLE);
             c.entryPrice = mapPrice == null || mapPrice <= 0 ? (tier.equalsIgnoreCase("legendary") ? 600 : tier.equalsIgnoreCase("rare") ? 300 : 100) : mapPrice;
             active.put(player.getUniqueId(), c);
+            cooldownData.set(cooldownPath, System.currentTimeMillis() + 12L * 60L * 60L * 1000L);
+            saveCooldowns();
             giveEquipment(player, c);
             spawnTarget(player, c);
             player.sendMessage("§d§lXZH BOUNTY HUNT");
-            player.sendMessage("§a✦ Bounty contract accepted successfully!");
+            player.sendMessage("§a✦ " + tier.toUpperCase(Locale.ROOT) + " " + dimension.toUpperCase(Locale.ROOT) + " bounty accepted!");
+            player.sendMessage("§7This bounty type is now on cooldown for 12 hours.");
             player.sendMessage("§e➤ Hold your Tracking Arrow and right-click to locate your bounty target.");
             player.sendMessage("§e➤ You can use the special Hunter's Bow to fight and defeat your target.");
             player.sendMessage("§7➤ Your mission equipment will be removed when the contract ends.");
@@ -168,117 +183,6 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
             player.sendActionBar("§dBounty target §8• §f" + (int) player.getLocation().distance(targetLocation) + " blocks away");
             player.getWorld().spawnParticle(Particle.END_ROD, player.getEyeLocation().add(player.getEyeLocation().getDirection().multiply(1.2)), 8, 0.2, 0.2, 0.2, 0.02);
             player.sendMessage("§dTracking updated. Follow the bearing and distance above your hotbar.");
-        }
-    }
-
-    private void startTreasureHunt(Player player, ItemStack map, org.bukkit.inventory.EquipmentSlot handSlot) {
-        Location existing = activeTreasures.get(player.getUniqueId());
-        if (existing != null && existing.getBlock().getType() == Material.CHEST) {
-            player.setCompassTarget(existing);
-            player.sendMessage("§6You already have an active treasure hunt. Follow your compass to the buried chest.");
-            return;
-        }
-        if (player.getWorld().getEnvironment() != World.Environment.NORMAL) {
-            player.sendMessage("§cTreasure Hunt Maps can only be activated in the Overworld. Your map was not consumed.");
-            return;
-        }
-        World world = player.getWorld();
-        Location origin = player.getLocation();
-        Location chestLocation = null;
-        for (int attempt = 0; attempt < 40; attempt++) {
-            double angle = random.nextDouble() * Math.PI * 2.0;
-            int distance = 180 + random.nextInt(221);
-            int x = origin.getBlockX() + (int)Math.round(Math.cos(angle) * distance);
-            int z = origin.getBlockZ() + (int)Math.round(Math.sin(angle) * distance);
-            int surfaceY = world.getHighestBlockYAt(x, z);
-            if (surfaceY <= world.getMinHeight() + 3 || surfaceY >= world.getMaxHeight() - 3) continue;
-            Material surfaceType = world.getBlockAt(x, surfaceY, z).getType();
-            Material groundType = world.getBlockAt(x, surfaceY - 2, z).getType();
-            if (!surfaceType.isSolid() || surfaceType.name().contains("LEAVES")
-                    || !groundType.isSolid()) continue;
-            Location candidate = new Location(world, x, surfaceY + 1, z);
-            if (!world.getBlockAt(x, surfaceY, z).getType().isSolid()
-                    || !candidate.getBlock().isPassable()
-                    || candidate.getBlock().getType() == Material.CHEST) continue;
-            chestLocation = candidate;
-            break;
-        }
-        if (chestLocation == null) {
-            player.sendMessage("§cCouldn't find a safe treasure location nearby. Your map was not consumed; try again in a different area.");
-            return;
-        }
-        chestLocation.getBlock().setType(Material.CHEST, false);
-        if (chestLocation.getBlock().getState() instanceof Chest chest) {
-            Inventory inventory = chest.getBlockInventory();
-            inventory.addItem(new ItemStack(Material.DIAMOND, 2 + random.nextInt(4)));
-            inventory.addItem(new ItemStack(Material.EMERALD, 5 + random.nextInt(8)));
-            inventory.addItem(new ItemStack(Material.GOLD_INGOT, 6 + random.nextInt(11)));
-            inventory.addItem(new ItemStack(Material.IRON_INGOT, 12 + random.nextInt(13)));
-            if (random.nextInt(3) == 0) inventory.addItem(new ItemStack(Material.GOLDEN_APPLE, 1));
-            chest.update(true, false);
-        }
-        activeTreasures.put(player.getUniqueId(), chestLocation.clone());
-        player.setCompassTarget(chestLocation);
-        ItemMeta missionMeta = map.getItemMeta();
-        String treasureTier = missionMeta == null ? "common" : missionMeta.getPersistentDataContainer().get(new NamespacedKey("xzheconomysystem", "treasure_hunt_tier"), PersistentDataType.STRING);
-        if (treasureTier == null) treasureTier = "common";
-        Double missionPrice = missionMeta == null ? null : missionMeta.getPersistentDataContainer().get(new NamespacedKey("xzheconomysystem", "mission_entry_price"), PersistentDataType.DOUBLE);
-        double entryPrice = missionPrice == null || missionPrice <= 0 ? (treasureTier.equals("legendary") ? 800 : treasureTier.equals("rare") ? 450 : 250) : missionPrice;
-        int rewardPercent = 30 + random.nextInt(31);
-        treasureRewards.put(player.getUniqueId(), (int)Math.ceil(entryPrice * (1.0 + rewardPercent / 100.0)));
-        long missionSeconds = treasureTier.equals("legendary") ? 7200L : treasureTier.equals("rare") ? 2700L : 1500L;
-        treasureTimers.put(player.getUniqueId(), missionSeconds);
-        // Treasure hunts are map-and-travel missions; never throw an Eye of Ender.
-        // Keep the X map available during travel; consume one map only when the hunt ends.
-        player.updateInventory();
-        player.sendMessage("§6§lXZH TREASURE HUNT");
-        player.sendMessage("§fTravel to the map location marked X and open the chest.");
-        player.sendMessage("§7Time limit: " + format(missionSeconds) + ". Hidden reward; possible profit bonus: §e30–60%§7.");
-        player.sendActionBar("§6Treasure §8• §f" + (int)player.getLocation().distance(chestLocation) + " blocks away");
-    }
-
-    @EventHandler(ignoreCancelled = true)
-    public void onTreasureChestOpen(InventoryOpenEvent event) {
-        if (!(event.getPlayer() instanceof Player player)) return;
-        Location opened = event.getInventory().getLocation();
-        if (opened == null) return;
-        UUID foundOwner = null;
-        for (Map.Entry<UUID, Location> entry : activeTreasures.entrySet()) {
-            Location target = entry.getValue();
-            if (target.getWorld().equals(opened.getWorld()) && target.getBlockX() == opened.getBlockX()
-                    && target.getBlockY() == opened.getBlockY() && target.getBlockZ() == opened.getBlockZ()) {
-                foundOwner = entry.getKey();
-                break;
-            }
-        }
-        if (foundOwner == null) return;
-        if (!player.getUniqueId().equals(foundOwner)) { event.setCancelled(true); player.sendMessage("§cThis treasure belongs to another hunter."); return; }
-        activeTreasures.remove(foundOwner);
-        treasureTimers.remove(foundOwner);
-        int reward = treasureRewards.getOrDefault(foundOwner, 0);
-        treasureRewards.remove(foundOwner);
-        boolean paid = reward > 0 && payReward(foundOwner, reward);
-        removeOneTreasureMap(player);
-        player.sendMessage(paid ? "§a§lTREASURE FOUND! §fHidden reward: §e" + reward + " coins §fdeposited into your bank." : "§a§lTREASURE FOUND! §fCollect your loot from the chest.");
-        Player owner = Bukkit.getPlayer(foundOwner);
-        if (owner != null && !owner.getUniqueId().equals(player.getUniqueId())) {
-            owner.sendMessage("§cYour treasure chest was found by " + player.getName() + ".");
-        }
-        Bukkit.broadcastMessage("§6[XZH Treasure Hunt] §f" + player.getName() + " discovered a buried treasure!");
-    }
-
-    private void removeOneTreasureMap(Player player) {
-        PlayerInventory inventory = player.getInventory();
-        for (int slot = 0; slot < inventory.getSize(); slot++) {
-            ItemStack item = inventory.getItem(slot);
-            if (item == null || !item.hasItemMeta()) continue;
-            ItemMeta meta = item.getItemMeta();
-            NamespacedKey key = new NamespacedKey("xzheconomysystem", "treasure_hunt_map");
-            if (!meta.getPersistentDataContainer().has(key, PersistentDataType.BYTE)) continue;
-            if (item.getAmount() > 1) item.setAmount(item.getAmount() - 1);
-            else inventory.setItem(slot, null);
-            player.updateInventory();
-            return;
         }
     }
 
@@ -340,38 +244,119 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
     private void spawnTarget(Player player, Contract c) {
         World world = player.getWorld();
         Location base = player.getLocation();
-        Location spawn = null;
-        for (int tries=0;tries<24;tries++) {
-            double angle = random.nextDouble()*Math.PI*2;
-            int distance = 70 + random.nextInt(81);
-            int x = base.getBlockX() + (int)Math.round(Math.cos(angle)*distance);
-            int z = base.getBlockZ() + (int)Math.round(Math.sin(angle)*distance);
-            int y = world.getHighestBlockYAt(x,z)+1;
-            Location candidate = new Location(world,x+0.5,y,z+0.5);
-            if (y < world.getMinHeight()+2 || y >= world.getMaxHeight()-3 || !candidate.getBlock().isPassable()
-                    || !candidate.clone().add(0,1,0).getBlock().isPassable()) continue;
-            spawn=candidate; break;
+        Location floor = null;
+        for (int tries = 0; tries < 48; tries++) {
+            double angle = random.nextDouble() * Math.PI * 2.0;
+            int distance = 90 + random.nextInt(151);
+            int x = base.getBlockX() + (int) Math.round(Math.cos(angle) * distance);
+            int z = base.getBlockZ() + (int) Math.round(Math.sin(angle) * distance);
+            int floorY;
+            if (c.dimension.equals("nether")) {
+                floorY = 32 + random.nextInt(62);
+                boolean found = false;
+                for (int scan = 0; scan < 30; scan++) {
+                    int y = 32 + random.nextInt(62);
+                    Material ground = world.getBlockAt(x, y, z).getType();
+                    Material feet = world.getBlockAt(x, y + 1, z).getType();
+                    Material head = world.getBlockAt(x, y + 2, z).getType();
+                    if (ground.isSolid() && ground != Material.BEDROCK && feet.isAir() && head.isAir()
+                            && feet != Material.LAVA && head != Material.LAVA) {
+                        floorY = y; found = true; break;
+                    }
+                }
+                if (!found) continue;
+            } else {
+                floorY = world.getHighestBlockYAt(x, z);
+                if (floorY <= world.getMinHeight() + 5 || floorY >= world.getMaxHeight() - 8) continue;
+            }
+            Material ground = world.getBlockAt(x, floorY, z).getType();
+            if (!ground.isSolid() || ground == Material.BEDROCK || ground == Material.LAVA) continue;
+            floor = new Location(world, x, floorY, z);
+            break;
         }
-        if (spawn==null) spawn=base.clone().add(0,1,0);
-        EntityType type = switch (c.tier) {
-            case "legendary" -> random.nextBoolean()?EntityType.RAVAGER:EntityType.PILLAGER;
-            case "rare" -> new EntityType[]{EntityType.VINDICATOR,EntityType.HUSK,EntityType.STRAY,EntityType.PILLAGER}[random.nextInt(4)];
-            default -> new EntityType[]{EntityType.ZOMBIE,EntityType.SKELETON,EntityType.SPIDER,EntityType.HUSK}[random.nextInt(4)];
-        };
-        Entity entity=world.spawnEntity(spawn,type);
+        if (floor == null) {
+            int x = base.getBlockX() + 24, z = base.getBlockZ() + 24;
+            int y = world.getHighestBlockYAt(x, z);
+            floor = new Location(world, x, y, z);
+        }
+
+        boolean challenging = !c.tier.equals("common");
+        Location spawn = challenging ? buildBountyChamber(world, floor, c.dimension) : floor.clone().add(0.5, 1, 0.5);
+        EntityType type;
+        if (c.dimension.equals("nether")) {
+            type = switch (c.tier) {
+                case "legendary" -> new EntityType[]{EntityType.WITHER_SKELETON, EntityType.PIGLIN_BRUTE, EntityType.HOGLIN}[random.nextInt(3)];
+                case "rare" -> new EntityType[]{EntityType.WITHER_SKELETON, EntityType.HOGLIN, EntityType.PIGLIN}[random.nextInt(3)];
+                default -> new EntityType[]{EntityType.ZOMBIFIED_PIGLIN, EntityType.MAGMA_CUBE, EntityType.SKELETON}[random.nextInt(3)];
+            };
+        } else {
+            type = switch (c.tier) {
+                case "legendary" -> random.nextBoolean() ? EntityType.RAVAGER : EntityType.PILLAGER;
+                case "rare" -> new EntityType[]{EntityType.VINDICATOR, EntityType.HUSK, EntityType.STRAY, EntityType.PILLAGER}[random.nextInt(4)];
+                default -> new EntityType[]{EntityType.ZOMBIE, EntityType.SKELETON, EntityType.SPIDER, EntityType.HUSK}[random.nextInt(4)];
+            };
+        }
+        Entity entity = world.spawnEntity(spawn, type);
         if (!(entity instanceof LivingEntity living)) { entity.remove(); return; }
-        c.target=entity.getUniqueId(); c.world=world.getName(); c.x=spawn.getX(); c.y=spawn.getY(); c.z=spawn.getZ();
+        c.target = entity.getUniqueId(); c.world = world.getName();
+        c.x = spawn.getX(); c.y = spawn.getY(); c.z = spawn.getZ();
         living.setGlowing(true);
-        living.setCustomName("§d§l"+c.tier.toUpperCase(Locale.ROOT)+" BOUNTY TARGET");
+        living.setCustomName("§d§l" + c.tier.toUpperCase(Locale.ROOT) + " " + c.dimension.toUpperCase(Locale.ROOT) + " BOUNTY TARGET");
         living.setCustomNameVisible(true);
         refreshContractBossBar(c, living);
-        living.getPersistentDataContainer().set(targetKey,PersistentDataType.STRING,c.owner.toString());
-        if (living.getAttribute(Attribute.MAX_HEALTH)!=null) {
-            double hp = c.tier.equals("legendary")?120:c.tier.equals("rare")?60:30;
+        living.getPersistentDataContainer().set(targetKey, PersistentDataType.STRING, c.owner.toString());
+        if (living.getAttribute(Attribute.MAX_HEALTH) != null) {
+            double hp = c.tier.equals("legendary") ? 180 : c.tier.equals("rare") ? 100 : 45;
             living.getAttribute(Attribute.MAX_HEALTH).setBaseValue(hp);
             living.setHealth(hp);
         }
         living.setRemoveWhenFarAway(false);
+
+        if (challenging) {
+            int backupCount = c.tier.equals("legendary") ? 4 : 2;
+            for (int i = 0; i < backupCount; i++) {
+                Location guard = spawn.clone().add((i % 2 == 0 ? -1 : 1) * (2 + i / 2), 0, (i % 3) - 1);
+                if (!guard.getBlock().isPassable()) guard = spawn.clone().add(i + 1, 0, 0);
+                Entity backup = world.spawnEntity(guard, EntityType.ZOMBIE);
+                if (backup instanceof LivingEntity guardMob) {
+                    guardMob.setCustomName("§cBounty Guard");
+                    guardMob.setCustomNameVisible(false);
+                    guardMob.setRemoveWhenFarAway(false);
+                    guardMob.getPersistentDataContainer().set(targetKey, PersistentDataType.STRING, c.owner.toString());
+                    if (guardMob.getAttribute(Attribute.MAX_HEALTH) != null) {
+                        guardMob.getAttribute(Attribute.MAX_HEALTH).setBaseValue(c.tier.equals("legendary") ? 40 : 28);
+                        guardMob.setHealth(guardMob.getAttribute(Attribute.MAX_HEALTH).getValue());
+                    }
+                }
+            }
+        }
+    }
+
+    private Location buildBountyChamber(World world, Location floor, String dimension) {
+        int x = floor.getBlockX(), y = floor.getBlockY(), z = floor.getBlockZ();
+        Material brick = dimension.equals("nether") ? Material.POLISHED_BLACKSTONE_BRICKS : Material.STONE_BRICKS;
+        Material trim = dimension.equals("nether") ? Material.NETHER_BRICKS : Material.CRACKED_STONE_BRICKS;
+        // A compact, open-front combat chamber makes Rare and Legendary hunts feel distinct.
+        for (int dx = -4; dx <= 4; dx++) {
+            for (int dz = -4; dz <= 4; dz++) {
+                world.getBlockAt(x + dx, y, z + dz).setType(brick, false);
+                for (int dy = 1; dy <= 4; dy++) {
+                    boolean wall = Math.abs(dx) == 4 || Math.abs(dz) == 4;
+                    boolean roof = dy == 4;
+                    boolean doorway = dx == -4 && dz == 0 && dy <= 2;
+                    if (doorway) {
+                        world.getBlockAt(x + dx, y + dy, z + dz).setType(Material.AIR, false);
+                    } else if (wall || roof) {
+                        world.getBlockAt(x + dx, y + dy, z + dz).setType((dy == 4 && dx % 2 == 0) ? trim : brick, false);
+                    } else {
+                        world.getBlockAt(x + dx, y + dy, z + dz).setType(Material.AIR, false);
+                    }
+                }
+            }
+        }
+        world.getBlockAt(x, y + 1, z).setType(Material.AIR, false);
+        world.getBlockAt(x, y + 2, z).setType(Material.AIR, false);
+        return new Location(world, x + 0.5, y + 1, z + 0.5);
     }
 
     private void restoreTarget(Contract c) {
@@ -426,28 +411,6 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
     }
 
     private void tick() {
-        for (UUID owner : new ArrayList<>(treasureTimers.keySet())) {
-            long left = treasureTimers.getOrDefault(owner, 0L) - 1L;
-            Player hunter = Bukkit.getPlayer(owner);
-            Location destination = activeTreasures.get(owner);
-            if (left <= 0) {
-                treasureTimers.remove(owner); treasureRewards.remove(owner);
-                activeTreasures.remove(owner);
-                if (destination != null && destination.getBlock().getType() == Material.CHEST) destination.getBlock().setType(Material.AIR, false);
-                if (hunter != null) { removeOneTreasureMap(hunter); hunter.sendMessage("§cTreasure hunt expired. The mission chest has been cleared."); }
-            } else {
-                treasureTimers.put(owner, left);
-                if (hunter != null && destination != null && hunter.getWorld() == destination.getWorld()) {
-                    hunter.setCompassTarget(destination);
-                    double dx = destination.getX() - hunter.getLocation().getX();
-                    double dz = destination.getZ() - hunter.getLocation().getZ();
-                    double angle = (Math.toDegrees(Math.atan2(-dx, dz)) + 360.0) % 360.0;
-                    String[] dirs = {"N","NE","E","SE","S","SW","W","NW"};
-                    hunter.sendActionBar("§6Treasure §8• §f" + dirs[(int)Math.round(angle / 45.0) % 8] + " §7| §e" + (int)hunter.getLocation().distance(destination) + " blocks §8| §7" + format(left));
-                    if (left % 60 == 0) hunter.sendMessage("§6Treasure time remaining: §f" + format(left));
-                }
-            }
-        }
         for (Contract c:new ArrayList<>(active.values())) {
             Player p=Bukkit.getPlayer(c.owner);
             if(p==null || !p.isOnline()) continue;
@@ -514,6 +477,12 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
             }
         }
         if(target!=null) target.remove();
+        for (World world : Bukkit.getWorlds()) {
+            for (Entity entity : new ArrayList<>(world.getEntities())) {
+                String taggedOwner = entity.getPersistentDataContainer().get(targetKey, PersistentDataType.STRING);
+                if (owner.toString().equals(taggedOwner)) entity.remove();
+            }
+        }
         Player p=Bukkit.getPlayer(owner);
         if(p!=null) {
             removeTaggedEquipment(p.getInventory(),owner);
@@ -566,7 +535,7 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
         for (String key : new HashSet<>(data.getKeys(false))) data.set(key, null);
         for(Contract c:active.values()) {
             String k=c.owner.toString();
-            data.set(k+".tier",c.tier); data.set(k+".target",c.target==null?null:c.target.toString());
+            data.set(k+".tier",c.tier); data.set(k+".dimension",c.dimension); data.set(k+".target",c.target==null?null:c.target.toString());
             data.set(k+".world",c.world); data.set(k+".x",c.x); data.set(k+".y",c.y); data.set(k+".z",c.z);
             data.set(k+".remaining",c.remainingSeconds); data.set(k+".entryPrice",c.entryPrice); data.set(k+".rewardPercent",c.rewardPercent);
         }
@@ -582,12 +551,24 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
                 String tier=data.getString(key+".tier","common");
                 Contract c=new Contract(owner,tier,data.getLong(key+".remaining",0));
                 String target=data.getString(key+".target"); if(target!=null)c.target=UUID.fromString(target);
+                c.dimension=data.getString(key+".dimension", "overworld");
                 c.world=data.getString(key+".world"); c.x=data.getDouble(key+".x"); c.y=data.getDouble(key+".y"); c.z=data.getDouble(key+".z");
                 c.entryPrice=data.getDouble(key+".entryPrice", c.tier.equals("legendary") ? 600 : c.tier.equals("rare") ? 300 : 100);
                 c.rewardPercent=data.getInt(key+".rewardPercent", 30 + random.nextInt(31));
                 if(c.remainingSeconds>0)active.put(owner,c);
             } catch(Exception ignored) {}
         }
+    }
+
+    private void loadCooldowns() {
+        if (!cooldownFile.exists()) return;
+        try { cooldownData.load(cooldownFile); }
+        catch (Exception ex) { plugin.getLogger().warning("Could not load bounty cooldowns: " + ex.getMessage()); }
+    }
+
+    private void saveCooldowns() {
+        try { cooldownData.save(cooldownFile); }
+        catch (IOException ex) { plugin.getLogger().warning("Could not save bounty cooldowns: " + ex.getMessage()); }
     }
 
     private String format(long s) { return String.format(Locale.ROOT,"%02d:%02d",s/60,s%60); }
