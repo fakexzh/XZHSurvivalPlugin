@@ -229,10 +229,7 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
         long missionSeconds = treasureTier.equals("legendary") ? 7200L : treasureTier.equals("rare") ? 2700L : 1500L;
         treasureTimers.put(player.getUniqueId(), missionSeconds);
         // Treasure hunts are map-and-travel missions; never throw an Eye of Ender.
-        if (map.getAmount() <= 1) {
-            if (handSlot == org.bukkit.inventory.EquipmentSlot.OFF_HAND) player.getInventory().setItemInOffHand(null);
-            else player.getInventory().setItemInMainHand(null);
-        } else map.setAmount(map.getAmount() - 1);
+        // Keep the X map available during travel; consume one map only when the hunt ends.
         player.updateInventory();
         player.sendMessage("§6§lXZH TREASURE HUNT");
         player.sendMessage("§fTravel to the map location marked X and open the chest.");
@@ -261,12 +258,28 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
         int reward = treasureRewards.getOrDefault(foundOwner, 0);
         treasureRewards.remove(foundOwner);
         boolean paid = reward > 0 && payReward(foundOwner, reward);
+        removeOneTreasureMap(player);
         player.sendMessage(paid ? "§a§lTREASURE FOUND! §fHidden reward: §e" + reward + " coins §fdeposited into your bank." : "§a§lTREASURE FOUND! §fCollect your loot from the chest.");
         Player owner = Bukkit.getPlayer(foundOwner);
         if (owner != null && !owner.getUniqueId().equals(player.getUniqueId())) {
             owner.sendMessage("§cYour treasure chest was found by " + player.getName() + ".");
         }
         Bukkit.broadcastMessage("§6[XZH Treasure Hunt] §f" + player.getName() + " discovered a buried treasure!");
+    }
+
+    private void removeOneTreasureMap(Player player) {
+        PlayerInventory inventory = player.getInventory();
+        for (int slot = 0; slot < inventory.getSize(); slot++) {
+            ItemStack item = inventory.getItem(slot);
+            if (item == null || !item.hasItemMeta()) continue;
+            ItemMeta meta = item.getItemMeta();
+            NamespacedKey key = new NamespacedKey("xzheconomysystem", "treasure_hunt_map");
+            if (!meta.getPersistentDataContainer().has(key, PersistentDataType.BYTE)) continue;
+            if (item.getAmount() > 1) item.setAmount(item.getAmount() - 1);
+            else inventory.setItem(slot, null);
+            player.updateInventory();
+            return;
+        }
     }
 
     private int countEmptyHotbarSlots(PlayerInventory inv) {
@@ -421,7 +434,7 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
                 treasureTimers.remove(owner); treasureRewards.remove(owner);
                 activeTreasures.remove(owner);
                 if (destination != null && destination.getBlock().getType() == Material.CHEST) destination.getBlock().setType(Material.AIR, false);
-                if (hunter != null) hunter.sendMessage("§cTreasure hunt expired. The mission chest has been cleared.");
+                if (hunter != null) { removeOneTreasureMap(hunter); hunter.sendMessage("§cTreasure hunt expired. The mission chest has been cleared."); }
             } else {
                 treasureTimers.put(owner, left);
                 if (hunter != null && destination != null && hunter.getWorld() == destination.getWorld()) {
