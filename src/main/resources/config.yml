@@ -37,10 +37,10 @@ custom-time:
   day-duration-seconds: 1800
   night-duration-seconds: 1800
 
-# Individual lifetime online playtime; level 1 at start, +1 per 3 accumulated hours.
+# Individual lifetime online playtime; level 1 at start, +1 per accumulated hour.
 mob-progression:
   enabled: true
-  hours-per-level: 3
+  hours-per-level: 1
   maximum-level: 100
   player-detection-range: 48.0
   equipment-chance-base: 0.08
