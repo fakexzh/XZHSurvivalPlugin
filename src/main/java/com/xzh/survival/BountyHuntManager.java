@@ -317,7 +317,8 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
             return;
         }
         inv.setItem(bowSlot, bow);
-        inv.setItem(arrowSlot, new ItemStack(Material.ARROW, 16));
+        arrow.setAmount(16);
+        inv.setItem(arrowSlot, arrow);
         inv.setItem(compassSlot, compass);
         player.updateInventory();
     }
