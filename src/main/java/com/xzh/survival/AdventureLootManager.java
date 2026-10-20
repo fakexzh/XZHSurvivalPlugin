@@ -17,6 +17,7 @@ import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.entity.ItemSpawnEvent;
 import org.bukkit.event.entity.PiglinBarterEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
+import org.bukkit.event.world.LootGenerateEvent;
 import org.bukkit.event.player.PlayerFishEvent;
 import org.bukkit.event.player.PlayerAttemptPickupItemEvent;
 import org.bukkit.inventory.ItemStack;
@@ -166,6 +167,18 @@ public final class AdventureLootManager implements Listener {
             return;
         }
         // Regular mob loot is intentionally silent. Fishing catches and bonus items are announced at catch time.
+    }
+
+    @EventHandler
+    public void onBuriedTreasureLootGenerate(LootGenerateEvent event) {
+        if (!plugin.getConfig().getBoolean("adventure-loot.enabled", true)) return;
+        if (event.getLootTable() == null || event.getLootTable().getKey() == null
+                || !event.getLootTable().getKey().getKey().equals("buried_treasure")) return;
+        // Add actual custom XZH coin items to the generated vanilla buried-treasure loot.
+        ItemStack tenCoins = createOfficialCoin(10, 2 + random.nextInt(7));
+        ItemStack singleCoins = createOfficialCoin(1, 10 + random.nextInt(21));
+        if (tenCoins != null) event.getLoot().add(tenCoins);
+        if (singleCoins != null) event.getLoot().add(singleCoins);
     }
 
     @EventHandler(ignoreCancelled = true)
