@@ -127,9 +127,10 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
                 player.sendMessage("§cBounty map not used: keep enough empty hotbar slots for both the Hunter's Bow and Tracking Arrow.");
                 return;
             }
-            int slot = player.getInventory().getHeldItemSlot();
             if (hand.getAmount() > 1) hand.setAmount(hand.getAmount() - 1);
-            else player.getInventory().setItem(slot, null);
+            else if (event.getHand() == org.bukkit.inventory.EquipmentSlot.OFF_HAND) player.getInventory().setItemInOffHand(null);
+            else player.getInventory().setItemInMainHand(null);
+            player.updateInventory();
             long defaultSeconds = tier.equals("common") ? 25*60L : tier.equals("rare") ? 45*60L : 2*60*60L;
             long seconds = plugin.getConfig().getLong("bounty-hunt.timers-seconds." + tier, defaultSeconds);
             Contract c = new Contract(player.getUniqueId(), tier, seconds);
