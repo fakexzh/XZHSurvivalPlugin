@@ -10,11 +10,9 @@ permissions:
     default: op
 
 commands:
-  customtime:
-    description: Configure custom day and night lengths
-    usage: /customtime <set|info|on|off>
-    aliases: [ct]
-    permission: xzhsurvival.admin
+  home:
+    description: Teleport to your placed bed home
+    usage: /home
   bounty:
     description: Manage your active bounty hunt
     usage: /bounty <cancel>
