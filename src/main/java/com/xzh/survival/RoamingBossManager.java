@@ -117,12 +117,7 @@ public final class RoamingBossManager implements Listener {
             long now = System.currentTimeMillis();
             long grace = state.engaged ? ENGAGED_DESPAWN_MILLIS : UNENGAGED_DESPAWN_MILLIS;
             if (now - state.lastCombatMillis >= grace) {
-                for (Player player : Bukkit.getOnlinePlayers()) {
-                    if (player.getWorld().equals(living.getWorld())
-                            && player.getLocation().distanceSquared(living.getLocation()) <= BOSSBAR_RANGE * BOSSBAR_RANGE) {
-                        player.sendMessage("§d§lX P L O R E §8» §eThe roaming boss vanished because no one fought it for 2 minutes.");
-                    }
-                }
+                Bukkit.broadcastMessage("§d§lX P L O R E §8» §eA roaming boss has vanished after 2 minutes without combat.");
                 state.bar.removeAll();
                 living.remove();
                 bosses.remove(state.id);
