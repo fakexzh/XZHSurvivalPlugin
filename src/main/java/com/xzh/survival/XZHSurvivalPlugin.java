@@ -70,6 +70,8 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
 
     private void migrateSurvivalConfig() {
         boolean changed = false;
+        // Remove legacy custom-time settings from existing server configs.
+        if (getConfig().contains("custom-time")) { getConfig().set("custom-time", null); changed = true; }
         // Upgrade the plugin's former bundled bounty defaults without overriding custom server values.
         if (getConfig().getInt("bounty-hunt.rewards.common", -1) == 500) {
             getConfig().set("bounty-hunt.rewards.common", 200);
