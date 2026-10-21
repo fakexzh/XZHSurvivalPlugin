@@ -31,12 +31,6 @@ death:
     minimum-bank-penalty: 200
     maximum-bank-penalty: 500
 
-custom-time:
-  # Disabled by default; when off, vanilla daylight cycling must remain enabled.
-  enabled: false
-  day-duration-seconds: 1800
-  night-duration-seconds: 1800
-
 # Individual lifetime online playtime; level 1 at start, +1 per accumulated hour.
 mob-progression:
   enabled: true
