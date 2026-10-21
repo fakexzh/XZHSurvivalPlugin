@@ -60,8 +60,8 @@ public final class RoamingBossManager implements Listener {
     private long ticks;
     private long nextSpawnAllowedMillis;
     private Location lastSpawnLocation;
-    private static final long UNENGAGED_DESPAWN_MILLIS = 5L * 60L * 1000L;
-    private static final long ENGAGED_DESPAWN_MILLIS = 10L * 60L * 1000L;
+    private static final long UNENGAGED_DESPAWN_MILLIS = 2L * 60L * 1000L;
+    private static final long ENGAGED_DESPAWN_MILLIS = 2L * 60L * 1000L;
     private static final long PLAYER_COOLDOWN_MILLIS = 2L * 60L * 60L * 1000L;
     private static final double DESPAWN_NEARBY_RANGE = 64.0;
     private static final double SPAWN_SEPARATION_BLOCKS = 500.0;
@@ -69,7 +69,7 @@ public final class RoamingBossManager implements Listener {
     private static final class BossState {
         private final UUID id;
         private final BossBar bar;
-        private long lastNearbyMillis = System.currentTimeMillis();
+        private long lastCombatMillis = System.currentTimeMillis();
         private boolean engaged;
         private BossState(UUID id, BossBar bar) { this.id = id; this.bar = bar; }
     }
@@ -115,19 +115,19 @@ public final class RoamingBossManager implements Listener {
                 continue;
             }
             long now = System.currentTimeMillis();
-            Player nearby = findTarget(living, DESPAWN_NEARBY_RANGE);
-            if (nearby != null) {
-                state.lastNearbyMillis = now;
-                state.engaged = true;
-            } else {
-                long grace = state.engaged ? ENGAGED_DESPAWN_MILLIS : UNENGAGED_DESPAWN_MILLIS;
-                if (now - state.lastNearbyMillis >= grace) {
-                    state.bar.removeAll();
-                    living.remove();
-                    bosses.remove(state.id);
-                    finishPlayerCooldown(state.id);
-                    continue;
+            long grace = state.engaged ? ENGAGED_DESPAWN_MILLIS : UNENGAGED_DESPAWN_MILLIS;
+            if (now - state.lastCombatMillis >= grace) {
+                for (Player player : Bukkit.getOnlinePlayers()) {
+                    if (player.getWorld().equals(living.getWorld())
+                            && player.getLocation().distanceSquared(living.getLocation()) <= BOSSBAR_RANGE * BOSSBAR_RANGE) {
+                        player.sendMessage("§d§lX P L O R E §8» §eThe roaming boss vanished because no one fought it for 2 minutes.");
+                    }
                 }
+                state.bar.removeAll();
+                living.remove();
+                bosses.remove(state.id);
+                finishPlayerCooldown(state.id);
+                continue;
             }
             double max = living.getAttribute(Attribute.MAX_HEALTH) == null
                     ? 40.0 : living.getAttribute(Attribute.MAX_HEALTH).getValue();
@@ -249,6 +249,32 @@ public final class RoamingBossManager implements Listener {
         bosses.put(boss.getUniqueId(), new BossState(boss.getUniqueId(), bar));
     }
 
+    @EventHandler(ignoreCancelled = true)
+    public void onCombat(EntityDamageByEntityEvent event) {
+        LivingEntity boss = null;
+        if (event.getEntity() instanceof LivingEntity victim
+                && victim.getPersistentDataContainer().has(bossKey, PersistentDataType.BYTE)
+                && isPlayerOrPlayerProjectile(event.getDamager())) boss = victim;
+        if (boss == null && event.getEntity() instanceof Player
+                && event.getDamager() instanceof Entity damager) {
+            if (damager instanceof LivingEntity living
+                    && living.getPersistentDataContainer().has(bossKey, PersistentDataType.BYTE)) boss = living;
+            else if (damager instanceof org.bukkit.entity.Projectile projectile
+                    && projectile.getShooter() instanceof LivingEntity shooter
+                    && shooter.getPersistentDataContainer().has(bossKey, PersistentDataType.BYTE)) boss = shooter;
+        }
+        if (boss != null) {
+            BossState state = bosses.get(boss.getUniqueId());
+            if (state != null) { state.engaged = true; state.lastCombatMillis = System.currentTimeMillis(); }
+        }
+    }
+
+    private boolean isPlayerOrPlayerProjectile(Entity damager) {
+        return damager instanceof Player
+                || damager instanceof org.bukkit.entity.Projectile projectile
+                && projectile.getShooter() instanceof Player;
+    }
+
     @EventHandler
     public void onBossDeath(EntityDeathEvent event) {
         LivingEntity entity = event.getEntity();
@@ -261,14 +287,14 @@ public final class RoamingBossManager implements Listener {
         ItemStack seal = new ItemStack(Material.TRIAL_KEY);
         ItemMeta meta = seal.getItemMeta();
         meta.setDisplayName("§d§l" + tierName(tier) + " Boss Reward Key");
-        meta.setLore(List.of("§7Earned by defeating a " + tierName(tier) + " roaming boss.", "§7Reward: §e" + reward + " bank coins", "§eBring this key to a Smith Villager", "§eand right-click to claim your reward."));
+        meta.setLore(List.of("§7Earned by defeating a " + tierName(tier) + " roaming boss.", "§7A mystery coin reward awaits.", "§eBring this key to a Smith Villager", "§eand right-click to reveal your reward."));
         meta.getPersistentDataContainer().set(sealKey, PersistentDataType.BYTE, (byte) 1);
         meta.getPersistentDataContainer().set(sealTierKey, PersistentDataType.STRING, tier);
         meta.getPersistentDataContainer().set(sealRewardKey, PersistentDataType.INTEGER, reward);
         seal.setItemMeta(meta);
         event.getDrops().add(seal);
         Player killer = entity.getKiller();
-        if (killer != null) killer.sendMessage("§d§lBOSS DEFEATED §8» §fYou received a §d" + tierName(tier) + " Boss Reward Key§f worth §e" + reward + " bank coins§f. Bring it to an Armorer, Weaponsmith, or Toolsmith and right-click to redeem.");
+        if (killer != null) killer.sendMessage("§d§lBOSS DEFEATED §8» §fYou received a §d" + tierName(tier) + " Boss Reward Key§f. Bring it to an Armorer, Weaponsmith, or Toolsmith to reveal your mystery reward.");
     }
 
     @EventHandler(ignoreCancelled = true)
@@ -284,14 +310,14 @@ public final class RoamingBossManager implements Listener {
         event.setCancelled(true);
         String tier = held.getItemMeta().getPersistentDataContainer().getOrDefault(sealTierKey, PersistentDataType.STRING, "common");
         int reward = held.getItemMeta().getPersistentDataContainer().getOrDefault(sealRewardKey, PersistentDataType.INTEGER, rewardForTier(tier));
-        if (!depositToBank(player.getUniqueId(), reward)) {
+        if (!payPocketReward(player.getUniqueId(), reward)) {
             player.sendMessage("§cYour key was not consumed because the XZH Bank could not be reached.");
             return;
         }
         if (held.getAmount() <= 1) player.getInventory().setItemInMainHand(null);
         else held.setAmount(held.getAmount() - 1);
-        player.sendMessage("§a" + tierName(tier) + " Boss Reward Key redeemed! §e" + reward + " coins §awere deposited directly into your bank.");
-        Bukkit.broadcastMessage("§d[XZH Exploration] §f" + player.getName() + " redeemed a " + tierName(tier) + " Boss Reward Key for " + reward + " bank coins.");
+        player.sendMessage("§a" + tierName(tier) + " Boss Reward Key redeemed! §eYou received " + reward + " coins in your pocket.");
+        Bukkit.broadcastMessage("§d[XZH Exploration] §f" + player.getName() + " redeemed a " + tierName(tier) + " Boss Reward Key.");
     }
 
     private boolean isLitSpawnArea(Location spawn) {
@@ -384,21 +410,20 @@ public final class RoamingBossManager implements Listener {
         else { org.bukkit.entity.Fireball fire = boss.getWorld().spawn(origin.add(direction.clone().multiply(1.2)), org.bukkit.entity.Fireball.class); fire.setDirection(direction); fire.setYield(1.5f); fire.setIsIncendiary(true); fire.setShooter(boss); }
     }
 
-    private boolean depositToBank(UUID playerId, int amount) {
+    private boolean payPocketReward(UUID playerId, int amount) {
         Plugin economy = Bukkit.getPluginManager().getPlugin("XZHEconomySystem");
         if (economy == null || !economy.isEnabled()) {
-            plugin.getLogger().warning("XZHEconomySystem unavailable; roaming boss reward could not be deposited.");
+            plugin.getLogger().warning("XZHEconomySystem unavailable; roaming boss reward could not be paid.");
             return false;
         }
         try {
-            Object manager = economy.getClass().getMethod("getBankManager").invoke(economy);
-            Method getBalance = manager.getClass().getMethod("getBalance", UUID.class);
-            Method setBalance = manager.getClass().getMethod("setBalance", UUID.class, double.class);
-            double balance = ((Number) getBalance.invoke(manager, playerId)).doubleValue();
-            setBalance.invoke(manager, playerId, balance + amount);
+            Method getBalance = economy.getClass().getMethod("getBalance", UUID.class);
+            Method setBalance = economy.getClass().getMethod("setBalance", UUID.class, double.class);
+            double balance = ((Number) getBalance.invoke(economy, playerId)).doubleValue();
+            setBalance.invoke(economy, playerId, balance + amount);
             return true;
         } catch (ReflectiveOperationException | RuntimeException ex) {
-            plugin.getLogger().warning("Could not deposit roaming boss reward: " + ex.getClass().getSimpleName());
+            plugin.getLogger().warning("Could not pay roaming boss reward: " + ex.getClass().getSimpleName());
             return false;
         }
     }
