@@ -306,7 +306,7 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
         refreshContractBossBar(c, living);
         living.getPersistentDataContainer().set(targetKey, PersistentDataType.STRING, c.owner.toString());
         if (living.getAttribute(Attribute.MAX_HEALTH) != null) {
-            double hp = c.tier.equals("legendary") ? 180 : c.tier.equals("rare") ? 100 : 45;
+            double hp = c.tier.equals("legendary") ? 600 : c.tier.equals("rare") ? 400 : 250;
             living.getAttribute(Attribute.MAX_HEALTH).setBaseValue(hp);
             living.setHealth(hp);
         }
