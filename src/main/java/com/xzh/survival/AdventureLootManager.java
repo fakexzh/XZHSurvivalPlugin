@@ -79,10 +79,12 @@ public final class AdventureLootManager implements Listener {
         }
         double extremeChance = Math.min(0.0002, plugin.getConfig().getDouble("adventure-loot.mob-loot.extreme-rare-chance", 0.0002) + (mobLevel - 1) * 0.000001);
         if (random.nextDouble() < extremeChance) {
-            Material[] extreme = {Material.ENCHANTED_BOOK, Material.DIAMOND, Material.NETHERITE_SCRAP,
+            Material[] extreme = {Material.DIAMOND, Material.NETHERITE_SCRAP,
                     Material.GOLD_BLOCK, Material.DIAMOND_BLOCK};
             event.getDrops().add(createLootItem(extreme[random.nextInt(extreme.length)]));
         }
+        // Enchanted books are exceptionally rare: 0.001% per mob reward roll.
+        if (random.nextDouble() < 0.00001) event.getDrops().add(createLootItem(Material.ENCHANTED_BOOK));
         // Tag only entities matching this mob's actual drop list, avoiding unrelated nearby items.
         org.bukkit.Location deathLocation = mob.getLocation().clone();
         org.bukkit.World deathWorld = mob.getWorld();
@@ -104,10 +106,15 @@ public final class AdventureLootManager implements Listener {
 
     @EventHandler(ignoreCancelled = true)
     public void onFishing(PlayerFishEvent event) {
-        if (event.getState() != PlayerFishEvent.State.CAUGHT_FISH
-                || !plugin.getConfig().getBoolean("adventure-loot.fishing.enabled", true)) return;
+        if (event.getState() != PlayerFishEvent.State.CAUGHT_FISH) return;
         if (!(event.getCaught() instanceof Item caught)) return;
         progressFishingQuest(event.getPlayer(), caught.getLocation());
+        // Vanilla treasure fishing can produce enchanted books; keep only a 0.001% chance.
+        if (caught.getItemStack().getType() == Material.ENCHANTED_BOOK && random.nextDouble() >= 0.00001) {
+            caught.remove();
+            return;
+        }
+        if (!plugin.getConfig().getBoolean("adventure-loot.fishing.enabled", true)) return;
         event.getPlayer().sendMessage("§b§l🎣 FISHING §8» §fCaught §e" + caught.getItemStack().getAmount()
                 + "x §f" + prettyName(caught.getItemStack().getType()) + "§b!");
         double coinChance = plugin.getConfig().getDouble("adventure-loot.fishing.coin-chance", 0.06);
@@ -118,17 +125,21 @@ public final class AdventureLootManager implements Listener {
                 markLootSource(coinDrop, "fishing");
             }
         }
+        // Independent enchanted-book roll: 0.001% per fishing catch, not per bonus tier.
+        if (random.nextDouble() < 0.00001) {
+            Item book = event.getPlayer().getWorld().dropItemNaturally(caught.getLocation(), createLootItem(Material.ENCHANTED_BOOK));
+            markMobLoot(book);
+            event.getPlayer().sendMessage("§d§l✦ FISHING BONUS §8» §fUltra-rare enchanted book!");
+        }
         double bonusChance = plugin.getConfig().getDouble("adventure-loot.fishing.bonus-reward-chance", 0.20);
         if (random.nextDouble() >= bonusChance) return;
         Material reward;
         double roll = random.nextDouble();
         if (roll < plugin.getConfig().getDouble("adventure-loot.fishing.extreme-rare-chance", 0.001)) {
-            Material[] extreme = {Material.ENCHANTED_BOOK, Material.DIAMOND, Material.NETHERITE_SCRAP};
+            Material[] extreme = {Material.DIAMOND, Material.NETHERITE_SCRAP};
             reward = extreme[random.nextInt(extreme.length)];
         } else if (roll < plugin.getConfig().getDouble("adventure-loot.fishing.rare-reward-chance", 0.035)) {
-            Material[] rare = {Material.NAME_TAG, Material.SADDLE, Material.ENCHANTED_BOOK,
-                    Material.GOLD_INGOT, Material.DIAMOND};
-            reward = rare[random.nextInt(rare.length)];
+            Material[] rare = {Material.NAME_TAG, Material.SADDLE, Material.GOLD_INGOT, Material.DIAMOND};
         } else {
             String biome = caught.getLocation().getBlock().getBiome().name();
             Material[] ordinary;
@@ -171,6 +182,14 @@ public final class AdventureLootManager implements Listener {
 
     @EventHandler
     public void onBuriedTreasureLootGenerate(LootGenerateEvent event) {
+        // Apply the same 0.001% enchanted-book rule to generated chest/reward loot tables.
+        Iterator<ItemStack> iterator = event.getLoot().iterator();
+        while (iterator.hasNext()) {
+            ItemStack stack = iterator.next();
+            if (stack != null && stack.getType() == Material.ENCHANTED_BOOK && random.nextDouble() >= 0.00001) {
+                iterator.remove();
+            }
+        }
         if (!plugin.getConfig().getBoolean("adventure-loot.enabled", true)) return;
         if (event.getLootTable() == null || event.getLootTable().getKey() == null
                 || !event.getLootTable().getKey().getKey().endsWith("buried_treasure")) return;
