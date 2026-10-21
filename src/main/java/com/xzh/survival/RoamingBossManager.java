@@ -54,13 +54,16 @@ public final class RoamingBossManager implements Listener {
     private final NamespacedKey sealRewardKey;
     private final Random random = new Random();
     private final Map<UUID, BossState> bosses = new HashMap<>();
+    private final Map<UUID, Long> playerCooldownUntil = new HashMap<>();
+    private final Map<UUID, UUID> encounterOwnerByBoss = new HashMap<>();
     private final Map<UUID, Location> lastSpawnCheckLocation = new HashMap<>();
     private long ticks;
     private long nextSpawnAllowedMillis;
     private Location lastSpawnLocation;
     private static final long UNENGAGED_DESPAWN_MILLIS = 5L * 60L * 1000L;
     private static final long ENGAGED_DESPAWN_MILLIS = 10L * 60L * 1000L;
-    private static final long SPAWN_COOLDOWN_MILLIS = 10L * 60L * 1000L;
+    private static final long MIN_PLAYER_COOLDOWN_MILLIS = 30L * 60L * 1000L;
+    private static final long MAX_PLAYER_COOLDOWN_MILLIS = 45L * 60L * 1000L;
     private static final double DESPAWN_NEARBY_RANGE = 64.0;
     private static final double SPAWN_SEPARATION_BLOCKS = 500.0;
 
@@ -109,6 +112,7 @@ public final class RoamingBossManager implements Listener {
             if (!(entity instanceof LivingEntity living) || living.isDead()) {
                 state.bar.removeAll();
                 bosses.remove(state.id);
+                finishPlayerCooldown(state.id);
                 continue;
             }
             long now = System.currentTimeMillis();
@@ -122,6 +126,7 @@ public final class RoamingBossManager implements Listener {
                     state.bar.removeAll();
                     living.remove();
                     bosses.remove(state.id);
+                    finishPlayerCooldown(state.id);
                     continue;
                 }
             }
@@ -151,8 +156,9 @@ public final class RoamingBossManager implements Listener {
             if (ticks % attackInterval(tier) == 0) launchSpecialAttack(living, tier);
         }
         if (!plugin.getConfig().getBoolean("roaming-bosses.enabled", true)) return;
-        if (ticks % 30 != 0 || bosses.size() >= 3 || System.currentTimeMillis() < nextSpawnAllowedMillis) return;
+        if (ticks % 20 != 0 || bosses.size() >= 3) return;
         for (Player player : Bukkit.getOnlinePlayers()) {
+            if (playerCooldownUntil.getOrDefault(player.getUniqueId(), 0L) > System.currentTimeMillis()) continue;
             Location current = player.getLocation();
             Location previous = lastSpawnCheckLocation.put(player.getUniqueId(), current.clone());
             if (previous == null || previous.getWorld() != current.getWorld()
@@ -165,12 +171,19 @@ public final class RoamingBossManager implements Listener {
             LivingEntity boss = spawnNear(player);
             if (boss != null) {
                 lastSpawnLocation = boss.getLocation().clone();
-                nextSpawnAllowedMillis = System.currentTimeMillis() + SPAWN_COOLDOWN_MILLIS;
+                encounterOwnerByBoss.put(boss.getUniqueId(), player.getUniqueId());
                 trackBoss(boss);
                 player.sendMessage("§d§lXZH EXPLORATION §8» §fA roaming boss has appeared somewhere nearby. Watch for its boss bar!");
                 break;
             }
         }
+    }
+
+    private void finishPlayerCooldown(UUID bossId) {
+        UUID owner = encounterOwnerByBoss.remove(bossId);
+        if (owner == null) return;
+        long duration = MIN_PLAYER_COOLDOWN_MILLIS + (long)(random.nextDouble() * (MAX_PLAYER_COOLDOWN_MILLIS - MIN_PLAYER_COOLDOWN_MILLIS + 1L));
+        playerCooldownUntil.put(owner, System.currentTimeMillis() + duration);
     }
 
     private boolean hasBossInWorld(World world) {
@@ -237,6 +250,7 @@ public final class RoamingBossManager implements Listener {
         if (!entity.getPersistentDataContainer().has(bossKey, PersistentDataType.BYTE)) return;
         BossState state = bosses.remove(entity.getUniqueId());
         if (state != null) state.bar.removeAll();
+        finishPlayerCooldown(entity.getUniqueId());
         String tier = entity.getPersistentDataContainer().getOrDefault(bossTierKey, PersistentDataType.STRING, "rare");
         int reward = rewardForTier(tier);
         ItemStack seal = new ItemStack(Material.TRIAL_KEY);
