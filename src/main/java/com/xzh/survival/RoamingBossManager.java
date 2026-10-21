@@ -250,7 +250,7 @@ public final class RoamingBossManager implements Listener {
     }
 
     @EventHandler(ignoreCancelled = true)
-    public void onCombat(EntityDamageByEntityEvent event) {
+    public void onCombat(org.bukkit.event.entity.EntityDamageByEntityEvent event) {
         LivingEntity boss = null;
         if (event.getEntity() instanceof LivingEntity victim
                 && victim.getPersistentDataContainer().has(bossKey, PersistentDataType.BYTE)
