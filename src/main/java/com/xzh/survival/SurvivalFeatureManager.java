@@ -133,7 +133,7 @@ public final class SurvivalFeatureManager implements Listener {
 
     @EventHandler(ignoreCancelled = true)
     public void onHorseAndDonkeyBreed(EntityBreedEvent event) {
-        EntityType childType = event.getEntityType();
+        EntityType childType = event.getEntity().getType();
         EntityType motherType = event.getMother().getType();
         EntityType fatherType = event.getFather().getType();
         if (childType == EntityType.HORSE || childType == EntityType.DONKEY
