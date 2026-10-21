@@ -381,7 +381,7 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
         for (int dx = -6; dx <= 6; dx++) for (int dz = -6; dz <= 6; dz++) {
             for (int dy = -6; dy <= 5; dy++) {
                 Material type = world.getBlockAt(x + dx, y + dy, z + dz).getType();
-                if (type.isAir() || type == Material.GRASS_BLOCK || type == Material.DIRT || type == Material.COARSE_DIRT || type == Material.ROOTED_DIRT || type == Material.STONE || type == Material.DEEPSLATE || type == Material.ANDESITE || type == Material.DIORITE || type == Material.GRANITE || type == Material.TUFF || type == Material.GRAVEL || type == Material.SAND || type == Material.RED_SAND || type == Material.SNOW || type == Material.SHORT_GRASS || type == Material.TALL_GRASS || type == Material.FERN || type == Material.DEAD_BUSH || type == Material.WATER) continue;
+                if (type.isAir() || type == Material.GRASS_BLOCK || type == Material.DIRT || type == Material.COARSE_DIRT || type == Material.ROOTED_DIRT || type == Material.STONE || type == Material.DEEPSLATE || type == Material.ANDESITE || type == Material.DIORITE || type == Material.GRANITE || type == Material.TUFF || type == Material.GRAVEL || type == Material.SAND || type == Material.RED_SAND || type == Material.SNOW || type == Material.SHORT_GRASS || type == Material.TALL_GRASS || type == Material.FERN || type == Material.DEAD_BUSH || type == Material.WATER || type == Material.NETHERRACK || type == Material.BASALT || type == Material.BLACKSTONE || type == Material.SOUL_SAND || type == Material.SOUL_SOIL || type == Material.CRIMSON_NYLIUM || type == Material.WARPED_NYLIUM || type == Material.MAGMA_BLOCK) continue;
                 return false;
             }
         }
