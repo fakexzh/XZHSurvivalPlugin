@@ -42,7 +42,6 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
     private FarmingManager farmingManager;
     private BountyHuntManager bountyHuntManager;
     private RoamingBossManager roamingBossManager;
-    private BedHomeManager bedHomeManager;
 
     @Override
     public void onEnable() {
@@ -53,8 +52,6 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         for (World world : Bukkit.getWorlds()) {
             world.setGameRule(org.bukkit.GameRule.DO_DAYLIGHT_CYCLE, true);
         }
-        bedHomeManager = new BedHomeManager(this);
-        bedHomeManager.start();
         survivalFeatureManager = new SurvivalFeatureManager(this);
         survivalFeatureManager.start();
         adventureLootManager = new AdventureLootManager(this);
@@ -94,7 +91,6 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         if (survivalFeatureManager != null) survivalFeatureManager.shutdown();
         if (bountyHuntManager != null) bountyHuntManager.shutdown();
         if (roamingBossManager != null) roamingBossManager.shutdown();
-        if (bedHomeManager != null) bedHomeManager.shutdown();
     }
 
     @EventHandler(ignoreCancelled = true)
