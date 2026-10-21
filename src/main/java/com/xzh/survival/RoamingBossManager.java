@@ -204,7 +204,7 @@ public final class RoamingBossManager implements Listener {
             Entity entity = world.spawnEntity(spawn, type);
             if (!(entity instanceof LivingEntity living)) { entity.remove(); continue; }
             String tier = rollTier();
-            double hp = tier.equals("common") ? 350.0 : tier.equals("rare") ? 260.0 : 180.0;
+            double hp = tier.equals("common") ? 80 + random.nextInt(21) : tier.equals("rare") ? 120 + random.nextInt(31) : 180 + random.nextInt(71);
             if (living.getAttribute(Attribute.MAX_HEALTH) != null) {
                 living.getAttribute(Attribute.MAX_HEALTH).setBaseValue(hp);
                 living.setHealth(hp);
@@ -300,7 +300,7 @@ public final class RoamingBossManager implements Listener {
         Bukkit.getScheduler().runTaskLater(plugin, () -> { if (step.getType() == Material.DIRT) step.setType(Material.AIR, false); }, 240L);
     }
 
-    private int rewardForTier(String tier) { int min = Math.max(50, plugin.getConfig().getInt("roaming-bosses.minimum-bank-reward", 50)); int max = Math.max(min, Math.min(500, plugin.getConfig().getInt("roaming-bosses.maximum-bank-reward", 500))); return min + random.nextInt(max - min + 1); }
+    private int rewardForTier(String tier) { return switch (tier.toLowerCase(java.util.Locale.ROOT)) { case "legendary" -> 300 + random.nextInt(301); case "rare" -> 130 + random.nextInt(171); default -> 50 + random.nextInt(81); }; }
     private void equipBoss(LivingEntity boss, String tier) {
         var gear = boss.getEquipment();
         if (gear == null) return;
