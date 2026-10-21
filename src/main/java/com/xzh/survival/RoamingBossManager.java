@@ -7,6 +7,8 @@ import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.World;
 import org.bukkit.attribute.Attribute;
+import org.bukkit.block.Block;
+import org.bukkit.block.BlockFace;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
@@ -48,6 +50,7 @@ public final class RoamingBossManager implements Listener {
     private final NamespacedKey sealKey;
     private final NamespacedKey bossTierKey;
     private final NamespacedKey sealTierKey;
+    private final NamespacedKey flyingKey;
     private final Random random = new Random();
     private final Map<UUID, BossState> bosses = new HashMap<>();
     private final Map<UUID, Location> lastSpawnCheckLocation = new HashMap<>();
@@ -65,6 +68,7 @@ public final class RoamingBossManager implements Listener {
         this.sealKey = new NamespacedKey(plugin, "wanderers_seal");
         this.bossTierKey = new NamespacedKey(plugin, "roaming_boss_tier");
         this.sealTierKey = new NamespacedKey(plugin, "wanderers_seal_tier");
+        this.flyingKey = new NamespacedKey(plugin, "roaming_boss_flying");
         Bukkit.getPluginManager().registerEvents(this, plugin);
     }
 
@@ -107,6 +111,18 @@ public final class RoamingBossManager implements Listener {
                     if (!state.bar.getPlayers().contains(player)) state.bar.addPlayer(player);
                 } else state.bar.removePlayer(player);
             }
+            Player target = findTarget(living, 40.0);
+            if (target != null && ticks % 8L == 0L && !living.getPersistentDataContainer().has(flyingKey, PersistentDataType.BYTE)) {
+                living.getPersistentDataContainer().set(flyingKey, PersistentDataType.BYTE, (byte) 1);
+                living.setGravity(false);
+                Vector delta = target.getLocation().add(0, 1.0, 0).toVector().subtract(living.getLocation().toVector());
+                if (delta.lengthSquared() > 0.01) living.setVelocity(delta.normalize().multiply(0.55).setY(0.35));
+                Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    if (living.isValid()) living.setGravity(true);
+                    living.getPersistentDataContainer().remove(flyingKey);
+                }, 30L);
+            }
+            if (target != null && target.getLocation().getY() > living.getLocation().getY() + 1.5 && ticks % 3L == 0L) tryBuildToward(living, target);
             if (ticks % attackInterval(tier) == 0) launchSpecialAttack(living, tier);
         }
         if (!plugin.getConfig().getBoolean("roaming-bosses.enabled", true)) return;
@@ -232,6 +248,28 @@ public final class RoamingBossManager implements Listener {
     private String rollTier() { int roll = random.nextInt(100); return roll < 55 ? "common" : roll < 88 ? "rare" : "legendary"; }
     private String tierName(String tier) { return switch (tier.toLowerCase(java.util.Locale.ROOT)) { case "legendary" -> "Legendary"; case "rare" -> "Rare"; default -> "Common"; }; }
     private String bossTitle(String tier) { return switch (tier.toLowerCase(java.util.Locale.ROOT)) { case "legendary" -> "§4§lLEGENDARY ROAMING BOSS"; case "rare" -> "§5§lRARE ROAMING BOSS"; default -> "§9§lCOMMON ROAMING BOSS"; }; }
+    private Player findTarget(LivingEntity boss, double range) {
+        Player target = null; double best = range * range;
+        for (Player player : boss.getWorld().getPlayers()) {
+            if (player.isDead() || player.getGameMode() == org.bukkit.GameMode.SPECTATOR) continue;
+            double distance = player.getLocation().distanceSquared(boss.getLocation());
+            if (distance < best) { best = distance; target = player; }
+        }
+        return target;
+    }
+
+    private void tryBuildToward(LivingEntity boss, Player target) {
+        if (boss.getLocation().distanceSquared(target.getLocation()) > 18.0 * 18.0) return;
+        double dx = target.getLocation().getX() - boss.getLocation().getX();
+        double dz = target.getLocation().getZ() - boss.getLocation().getZ();
+        BlockFace face = Math.abs(dx) > Math.abs(dz) ? (dx >= 0 ? BlockFace.EAST : BlockFace.WEST)
+                : (dz >= 0 ? BlockFace.SOUTH : BlockFace.NORTH);
+        Block step = boss.getLocation().getBlock().getRelative(face);
+        if (!step.getType().isAir() || step.isLiquid() || !step.getRelative(BlockFace.DOWN).getType().isSolid()) return;
+        step.setType(Material.DIRT, false);
+        Bukkit.getScheduler().runTaskLater(plugin, () -> { if (step.getType() == Material.DIRT) step.setType(Material.AIR, false); }, 240L);
+    }
+
     private int rewardForTier(String tier) { int min = Math.max(50, plugin.getConfig().getInt("roaming-bosses.minimum-bank-reward", 50)); int max = Math.max(min, Math.min(500, plugin.getConfig().getInt("roaming-bosses.maximum-bank-reward", 500))); return min + random.nextInt(max - min + 1); }
     private void equipBoss(LivingEntity boss, String tier) {
         var gear = boss.getEquipment();
