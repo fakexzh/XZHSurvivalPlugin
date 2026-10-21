@@ -438,10 +438,10 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
         int reward=(int)Math.ceil(c.entryPrice * (1.0 + c.rewardPercent / 100.0));
         boolean paid = payReward(ownerId,reward);
         if (owner!=null) owner.sendMessage(paid
-                ? "§a§lBOUNTY COMPLETE! §fReward: §e"+reward+" coins §fdeposited directly into your bank."
-                : "§cBounty completed, but the bank payout failed. Contact an admin.");
+                ? "§a§lBOUNTY COMPLETE! §fReward: §e"+reward+" coins §fadded to your pocket."
+                : "§cBounty completed, but the pocket payout failed. Contact an admin.");
         if (paid) Bukkit.broadcastMessage("§d[XZH Bounty] §f" + (owner == null ? "A player" : owner.getName())
-                + " completed a " + c.tier + " bounty. §e" + reward + " coins §fwere deposited into their bank.");
+                + " completed a " + c.tier + " bounty. §e" + reward + " coins §fwere added to their pocket.");
         finish(ownerId,"completed");
     }
 
@@ -570,20 +570,19 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
         Plugin economy=Bukkit.getPluginManager().getPlugin("XZHEconomySystem");
         if(economy==null||!economy.isEnabled()) {
             Player online=Bukkit.getPlayer(playerId);
-            if(online!=null) online.sendMessage("§cEconomy unavailable; bank reward could not be paid. Contact an admin.");
+            if(online!=null) online.sendMessage("§cEconomy unavailable; pocket reward could not be paid. Contact an admin.");
             return false;
         }
         try {
-            Object bankManager=economy.getClass().getMethod("getBankManager").invoke(economy);
-            Method getBalance=bankManager.getClass().getMethod("getBalance",UUID.class);
-            Method setBalance=bankManager.getClass().getMethod("setBalance",UUID.class,double.class);
-            double balance=((Number)getBalance.invoke(bankManager,playerId)).doubleValue();
-            setBalance.invoke(bankManager,playerId,balance+amount);
+            Method getBalance=economy.getClass().getMethod("getBalance",UUID.class);
+            Method setBalance=economy.getClass().getMethod("setBalance",UUID.class,double.class);
+            double balance=((Number)getBalance.invoke(economy,playerId)).doubleValue();
+            setBalance.invoke(economy,playerId,balance+amount);
             return true;
         } catch(ReflectiveOperationException|RuntimeException ex) {
-            plugin.getLogger().warning("Could not deposit bounty reward into bank: "+ex.getClass().getSimpleName());
+            plugin.getLogger().warning("Could not pay bounty reward into pocket: "+ex.getClass().getSimpleName());
             Player online=Bukkit.getPlayer(playerId);
-            if(online!=null) online.sendMessage("§cBank reward failed; contact an admin.");
+            if(online!=null) online.sendMessage("§cPocket reward failed; contact an admin.");
             return false;
         }
     }
