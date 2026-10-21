@@ -51,6 +51,7 @@ public final class RoamingBossManager implements Listener {
     private final NamespacedKey bossTierKey;
     private final NamespacedKey sealTierKey;
     private final NamespacedKey flyingKey;
+    private final NamespacedKey sealRewardKey;
     private final Random random = new Random();
     private final Map<UUID, BossState> bosses = new HashMap<>();
     private final Map<UUID, Location> lastSpawnCheckLocation = new HashMap<>();
@@ -69,6 +70,7 @@ public final class RoamingBossManager implements Listener {
         this.bossTierKey = new NamespacedKey(plugin, "roaming_boss_tier");
         this.sealTierKey = new NamespacedKey(plugin, "wanderers_seal_tier");
         this.flyingKey = new NamespacedKey(plugin, "roaming_boss_flying");
+        this.sealRewardKey = new NamespacedKey(plugin, "wanderers_seal_reward");
         Bukkit.getPluginManager().registerEvents(this, plugin);
     }
 
@@ -216,6 +218,7 @@ public final class RoamingBossManager implements Listener {
         meta.setLore(List.of("§7Earned by defeating a " + tierName(tier) + " roaming boss.", "§7Reward: §e" + reward + " bank coins", "§eBring this key to a Smith Villager", "§eand right-click to claim your reward."));
         meta.getPersistentDataContainer().set(sealKey, PersistentDataType.BYTE, (byte) 1);
         meta.getPersistentDataContainer().set(sealTierKey, PersistentDataType.STRING, tier);
+        meta.getPersistentDataContainer().set(sealRewardKey, PersistentDataType.INTEGER, reward);
         seal.setItemMeta(meta);
         event.getDrops().add(seal);
         Player killer = entity.getKiller();
@@ -234,7 +237,7 @@ public final class RoamingBossManager implements Listener {
                 || !held.getItemMeta().getPersistentDataContainer().has(sealKey, PersistentDataType.BYTE)) return;
         event.setCancelled(true);
         String tier = held.getItemMeta().getPersistentDataContainer().getOrDefault(sealTierKey, PersistentDataType.STRING, "common");
-        int reward = rewardForTier(tier);
+        int reward = held.getItemMeta().getPersistentDataContainer().getOrDefault(sealRewardKey, PersistentDataType.INTEGER, rewardForTier(tier));
         if (!depositToBank(player.getUniqueId(), reward)) {
             player.sendMessage("§cYour key was not consumed because the XZH Bank could not be reached.");
             return;
