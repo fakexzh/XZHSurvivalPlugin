@@ -198,6 +198,9 @@ public final class CustomTimeManager implements CommandExecutor, TabCompleter, L
                 || !controlledWorlds.contains(world)) return;
         if (event.getSkipReason() != TimeSkipEvent.SkipReason.NIGHT_SKIP) return;
 
+        // The custom cycle owns time while enabled. Cancel vanilla's skip and advance
+        // the phase ourselves so the next scheduled tick cannot overwrite the wake-up.
+        event.setCancelled(true);
         CycleState state = states.get(world);
         if (state == null) return;
         state.day = true;
