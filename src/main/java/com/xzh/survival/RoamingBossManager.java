@@ -158,7 +158,13 @@ public final class RoamingBossManager implements Listener {
         if (!plugin.getConfig().getBoolean("roaming-bosses.enabled", true)) return;
         if (ticks % 20 != 0 || bosses.size() >= 3) return;
         for (Player player : Bukkit.getOnlinePlayers()) {
-            if (playerCooldownUntil.getOrDefault(player.getUniqueId(), 0L) > System.currentTimeMillis()) continue;
+            long now = System.currentTimeMillis();
+            if (!playerCooldownUntil.containsKey(player.getUniqueId())) {
+                long initialDelay = MIN_PLAYER_COOLDOWN_MILLIS + (long)(random.nextDouble() * (MAX_PLAYER_COOLDOWN_MILLIS - MIN_PLAYER_COOLDOWN_MILLIS + 1L));
+                playerCooldownUntil.put(player.getUniqueId(), now + initialDelay);
+                continue;
+            }
+            if (playerCooldownUntil.getOrDefault(player.getUniqueId(), 0L) > now) continue;
             Location current = player.getLocation();
             Location previous = lastSpawnCheckLocation.put(player.getUniqueId(), current.clone());
             if (previous == null || previous.getWorld() != current.getWorld()
