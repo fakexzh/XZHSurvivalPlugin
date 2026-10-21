@@ -13,12 +13,16 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.EventPriority;
+import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 
 public final class BedHomeManager implements Listener, CommandExecutor {
@@ -47,10 +51,15 @@ public final class BedHomeManager implements Listener, CommandExecutor {
             sender.sendMessage("This command can only be used by a player.");
             return true;
         }
+        teleportHome(player);
+        return true;
+    }
+
+    private void teleportHome(Player player) {
         Location home = homes.get(player.getUniqueId());
         if (home == null) {
             player.sendMessage("§cYou don't have a home yet. Place a bed to create one.");
-            return true;
+            return;
         }
 
         World world = home.getWorld();
@@ -58,16 +67,39 @@ public final class BedHomeManager implements Listener, CommandExecutor {
             homes.remove(player.getUniqueId());
             saveHomes();
             player.sendMessage("§cYour bed home no longer exists. Place a new bed to set a home.");
-            return true;
+            return;
         }
 
         Location destination = home.clone().add(0.5, 1.0, 0.5);
         if (!player.teleport(destination)) {
             player.sendMessage("§cCould not teleport you to your bed home.");
-            return true;
+            return;
         }
         player.sendMessage("§aTeleported to your bed home.");
-        return true;
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onHomeCommandPreprocess(PlayerCommandPreprocessEvent event) {
+        String raw = event.getMessage();
+        if (raw == null || !raw.startsWith("/")) return;
+        String[] parts = raw.substring(1).trim().split("\\s+");
+        if (parts.length == 0 || parts[0].isBlank()) return;
+
+        String root = parts[0].toLowerCase(Locale.ROOT);
+        int namespace = root.indexOf(':');
+        if (namespace >= 0) root = root.substring(namespace + 1);
+
+        Set<String> homeManagementCommands = Set.of(
+                "sethome", "homes", "delhome", "deletehome", "removehome", "home");
+        if (!homeManagementCommands.contains(root)) return;
+
+        event.setCancelled(true);
+        Player player = event.getPlayer();
+        if (root.equals("home") && parts.length == 1) {
+            teleportHome(player);
+        } else {
+            player.sendMessage("§cOnly §f/home §cis available. Place a bed to set your home; breaking it clears the home.");
+        }
     }
 
     @EventHandler(ignoreCancelled = true)
