@@ -140,6 +140,7 @@ public final class AdventureLootManager implements Listener {
             reward = extreme[random.nextInt(extreme.length)];
         } else if (roll < plugin.getConfig().getDouble("adventure-loot.fishing.rare-reward-chance", 0.035)) {
             Material[] rare = {Material.NAME_TAG, Material.SADDLE, Material.GOLD_INGOT, Material.DIAMOND};
+            reward = rare[random.nextInt(rare.length)];
         } else {
             String biome = caught.getLocation().getBlock().getBiome().name();
             Material[] ordinary;
