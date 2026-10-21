@@ -56,10 +56,19 @@ public final class RoamingBossManager implements Listener {
     private final Map<UUID, BossState> bosses = new HashMap<>();
     private final Map<UUID, Location> lastSpawnCheckLocation = new HashMap<>();
     private long ticks;
+    private long nextSpawnAllowedMillis;
+    private Location lastSpawnLocation;
+    private static final long UNENGAGED_DESPAWN_MILLIS = 5L * 60L * 1000L;
+    private static final long ENGAGED_DESPAWN_MILLIS = 10L * 60L * 1000L;
+    private static final long SPAWN_COOLDOWN_MILLIS = 10L * 60L * 1000L;
+    private static final double DESPAWN_NEARBY_RANGE = 64.0;
+    private static final double SPAWN_SEPARATION_BLOCKS = 500.0;
 
     private static final class BossState {
         private final UUID id;
         private final BossBar bar;
+        private long lastNearbyMillis = System.currentTimeMillis();
+        private boolean engaged;
         private BossState(UUID id, BossBar bar) { this.id = id; this.bar = bar; }
     }
 
@@ -102,6 +111,20 @@ public final class RoamingBossManager implements Listener {
                 bosses.remove(state.id);
                 continue;
             }
+            long now = System.currentTimeMillis();
+            Player nearby = findTarget(living, DESPAWN_NEARBY_RANGE);
+            if (nearby != null) {
+                state.lastNearbyMillis = now;
+                state.engaged = true;
+            } else {
+                long grace = state.engaged ? ENGAGED_DESPAWN_MILLIS : UNENGAGED_DESPAWN_MILLIS;
+                if (now - state.lastNearbyMillis >= grace) {
+                    state.bar.removeAll();
+                    living.remove();
+                    bosses.remove(state.id);
+                    continue;
+                }
+            }
             double max = living.getAttribute(Attribute.MAX_HEALTH) == null
                     ? 40.0 : living.getAttribute(Attribute.MAX_HEALTH).getValue();
             state.bar.setProgress(Math.max(0.0, Math.min(1.0, living.getHealth() / Math.max(1.0, max))));
@@ -128,7 +151,7 @@ public final class RoamingBossManager implements Listener {
             if (ticks % attackInterval(tier) == 0) launchSpecialAttack(living, tier);
         }
         if (!plugin.getConfig().getBoolean("roaming-bosses.enabled", true)) return;
-        if (ticks % 30 != 0 || bosses.size() >= 3) return;
+        if (ticks % 30 != 0 || bosses.size() >= 3 || System.currentTimeMillis() < nextSpawnAllowedMillis) return;
         for (Player player : Bukkit.getOnlinePlayers()) {
             Location current = player.getLocation();
             Location previous = lastSpawnCheckLocation.put(player.getUniqueId(), current.clone());
@@ -136,9 +159,13 @@ public final class RoamingBossManager implements Listener {
                     || previous.distanceSquared(current) < 100.0) continue; // Must have explored at least 10 blocks since the previous check.
             if (player.getWorld().getEnvironment() != World.Environment.NORMAL) continue;
             if (hasBossInWorld(player.getWorld())) continue;
+            if (lastSpawnLocation != null && lastSpawnLocation.getWorld().equals(player.getWorld())
+                    && lastSpawnLocation.distanceSquared(current) < SPAWN_SEPARATION_BLOCKS * SPAWN_SEPARATION_BLOCKS) continue;
             if (random.nextDouble() > plugin.getConfig().getDouble("roaming-bosses.spawn-chance-per-check", 0.035)) continue;
             LivingEntity boss = spawnNear(player);
             if (boss != null) {
+                lastSpawnLocation = boss.getLocation().clone();
+                nextSpawnAllowedMillis = System.currentTimeMillis() + SPAWN_COOLDOWN_MILLIS;
                 trackBoss(boss);
                 player.sendMessage("§d§lXZH EXPLORATION §8» §fA roaming boss has appeared somewhere nearby. Watch for its boss bar!");
                 break;
@@ -177,7 +204,7 @@ public final class RoamingBossManager implements Listener {
             Entity entity = world.spawnEntity(spawn, type);
             if (!(entity instanceof LivingEntity living)) { entity.remove(); continue; }
             String tier = rollTier();
-            double hp = tier.equals("legendary") ? 180.0 : tier.equals("rare") ? 120.0 : 80.0;
+            double hp = tier.equals("common") ? 350.0 : tier.equals("rare") ? 260.0 : 180.0;
             if (living.getAttribute(Attribute.MAX_HEALTH) != null) {
                 living.getAttribute(Attribute.MAX_HEALTH).setBaseValue(hp);
                 living.setHealth(hp);
