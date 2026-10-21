@@ -28,6 +28,8 @@ import org.bukkit.potion.PotionEffectType;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.CreatureSpawnEvent;
+import org.bukkit.event.entity.EntityBreedEvent;
+import org.bukkit.entity.EntityType;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
@@ -113,6 +115,32 @@ public final class SurvivalFeatureManager implements Listener {
         removeHealthDisplay(event.getPlayer().getUniqueId());
         savePlaytime();
         Bukkit.getScheduler().runTask(plugin, this::refreshAllTabs);
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onShopOnlyHorseAndDonkeySpawn(CreatureSpawnEvent event) {
+        EntityType type = event.getEntityType();
+        if (type != EntityType.HORSE && type != EntityType.DONKEY) return;
+
+        CreatureSpawnEvent.SpawnReason reason = event.getSpawnReason();
+        // Keep spawn eggs, commands, and other intentional/admin spawns available;
+        // stop only naturally generated horses and donkeys.
+        if (reason == CreatureSpawnEvent.SpawnReason.NATURAL
+                || reason == CreatureSpawnEvent.SpawnReason.CHUNK_GEN) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onHorseAndDonkeyBreed(EntityBreedEvent event) {
+        EntityType childType = event.getEntityType();
+        EntityType motherType = event.getMother().getType();
+        EntityType fatherType = event.getFather().getType();
+        if (childType == EntityType.HORSE || childType == EntityType.DONKEY
+                || motherType == EntityType.HORSE || motherType == EntityType.DONKEY
+                || fatherType == EntityType.HORSE || fatherType == EntityType.DONKEY) {
+            event.setCancelled(true);
+        }
     }
 
     @EventHandler(ignoreCancelled = true)
