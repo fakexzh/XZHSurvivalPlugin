@@ -36,21 +36,25 @@ import java.util.UUID;
 public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
     private final Random random = new Random();
     private final Map<UUID, Integer> pendingXpRestore = new HashMap<>();
-    private CustomTimeManager customTimeManager;
     private SurvivalFeatureManager survivalFeatureManager;
     private AdventureLootManager adventureLootManager;
     private DynamicTradingManager dynamicTradingManager;
     private FarmingManager farmingManager;
     private BountyHuntManager bountyHuntManager;
     private RoamingBossManager roamingBossManager;
+    private BedHomeManager bedHomeManager;
 
     @Override
     public void onEnable() {
         saveDefaultConfig();
         migrateSurvivalConfig();
         getServer().getPluginManager().registerEvents(this, this);
-        customTimeManager = new CustomTimeManager(this);
-        customTimeManager.start();
+        // Restore vanilla daylight cycling if an older plugin version left it disabled.
+        for (World world : Bukkit.getWorlds()) {
+            world.setGameRule(org.bukkit.GameRule.DO_DAYLIGHT_CYCLE, true);
+        }
+        bedHomeManager = new BedHomeManager(this);
+        bedHomeManager.start();
         survivalFeatureManager = new SurvivalFeatureManager(this);
         survivalFeatureManager.start();
         adventureLootManager = new AdventureLootManager(this);
@@ -87,10 +91,10 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
 
     @Override
     public void onDisable() {
-        if (customTimeManager != null) customTimeManager.shutdown();
         if (survivalFeatureManager != null) survivalFeatureManager.shutdown();
         if (bountyHuntManager != null) bountyHuntManager.shutdown();
         if (roamingBossManager != null) roamingBossManager.shutdown();
+        if (bedHomeManager != null) bedHomeManager.shutdown();
     }
 
     @EventHandler(ignoreCancelled = true)
