@@ -41,7 +41,7 @@ custom-time:
 mob-progression:
   enabled: true
   hours-per-level: 1
-  maximum-level: 100
+  maximum-level: 25
   player-detection-range: 48.0
   equipment-chance-base: 0.08
   equipment-chance-per-level: 0.004
@@ -116,4 +116,5 @@ combat-indicators:
 roaming-bosses:
   enabled: true
   spawn-chance-per-check: 0.035
-  bank-reward: 750
+  minimum-bank-reward: 50
+  maximum-bank-reward: 500
