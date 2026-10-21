@@ -10,6 +10,7 @@ import org.bukkit.entity.WanderingTrader;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
+import org.bukkit.event.entity.VillagerAcquireTradeEvent;
 import org.bukkit.inventory.Merchant;
 import org.bukkit.inventory.MerchantRecipe;
 import org.bukkit.inventory.ItemStack;
@@ -45,12 +46,25 @@ public final class DynamicTradingManager implements Listener {
         Bukkit.getPluginManager().registerEvents(this, plugin);
     }
 
+    @EventHandler
+    public void onAcquireTrade(VillagerAcquireTradeEvent event) {
+        if (containsBookTradeItem(event.getRecipe())) event.setCancelled(true);
+    }
+
     @EventHandler(ignoreCancelled = true)
     public void onTraderInteract(PlayerInteractEntityEvent event) {
         Entity entity = event.getRightClicked();
         if (!(entity instanceof Villager) && !(entity instanceof WanderingTrader)) return;
         if (!plugin.getConfig().getBoolean("dynamic-trading.enabled", true)) return;
         if (!(entity instanceof Merchant merchant)) return;
+
+        // Filter current offers every interaction as well as newly acquired offers, so
+        // a villager leveling up after its first visit cannot reintroduce book trades.
+        List<MerchantRecipe> currentFiltered = new ArrayList<>();
+        for (MerchantRecipe recipe : merchant.getRecipes()) {
+            if (!containsBookTradeItem(recipe)) currentFiltered.add(recipe);
+        }
+        if (currentFiltered.size() != merchant.getRecipes().size()) merchant.setRecipes(currentFiltered);
 
         UUID id = entity.getUniqueId();
         List<MerchantRecipe> base = baseRecipes.computeIfAbsent(id, ignored -> {
