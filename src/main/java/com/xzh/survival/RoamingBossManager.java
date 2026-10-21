@@ -228,7 +228,7 @@ public final class RoamingBossManager implements Listener {
     private String rollTier() { int roll = random.nextInt(100); return roll < 55 ? "common" : roll < 88 ? "rare" : "legendary"; }
     private String tierName(String tier) { return switch (tier.toLowerCase(java.util.Locale.ROOT)) { case "legendary" -> "Legendary"; case "rare" -> "Rare"; default -> "Common"; }; }
     private String bossTitle(String tier) { return switch (tier.toLowerCase(java.util.Locale.ROOT)) { case "legendary" -> "§4§lLEGENDARY ROAMING BOSS"; case "rare" -> "§5§lRARE ROAMING BOSS"; default -> "§9§lCOMMON ROAMING BOSS"; }; }
-    private int rewardForTier(String tier) { String key = tier.toLowerCase(java.util.Locale.ROOT); int fallback = key.equals("legendary") ? 2500 : key.equals("rare") ? 1200 : 500; String path = "roaming-bosses.rewards." + key; return Math.max(1, plugin.getConfig().contains(path) ? plugin.getConfig().getInt(path, fallback) : fallback); }
+    private int rewardForTier(String tier) { int min = Math.max(50, plugin.getConfig().getInt("roaming-bosses.minimum-bank-reward", 50)); int max = Math.max(min, Math.min(500, plugin.getConfig().getInt("roaming-bosses.maximum-bank-reward", 500))); return min + random.nextInt(max - min + 1); }
     private long attackInterval(String tier) { return tier.equals("legendary") ? 3L : tier.equals("rare") ? 4L : 5L; }
     private void launchSpecialAttack(LivingEntity boss, String tier) {
         Player target = null; double best = 24.0 * 24.0;
