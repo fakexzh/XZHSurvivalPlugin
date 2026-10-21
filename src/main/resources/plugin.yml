@@ -10,9 +10,6 @@ permissions:
     default: op
 
 commands:
-  home:
-    description: Teleport to your placed bed home
-    usage: /home
   bounty:
     description: Manage your active bounty hunt
     usage: /bounty <cancel>
