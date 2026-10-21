@@ -50,6 +50,7 @@ import java.util.Random;
 import java.util.UUID;
 
 public final class SurvivalFeatureManager implements Listener {
+    private static final int MAX_MONSTER_LEVEL = 25;
     private final JavaPlugin plugin;
     private final Random random = new Random();
     private final Map<UUID, Long> playtimeSeconds = new HashMap<>();
@@ -72,10 +73,10 @@ public final class SurvivalFeatureManager implements Listener {
 
     public void start() {
         loadPlaytime();
-        if (plugin.getConfig().getLong("mob-progression.hours-per-level", 3L) != 1L) {
-            plugin.getConfig().set("mob-progression.hours-per-level", 1L);
-            plugin.saveConfig();
-        }
+        boolean configChanged = false;
+        if (plugin.getConfig().getLong("mob-progression.hours-per-level", 1L) != 1L) { plugin.getConfig().set("mob-progression.hours-per-level", 1L); configChanged = true; }
+        if (plugin.getConfig().getInt("mob-progression.maximum-level", 25) != 25) { plugin.getConfig().set("mob-progression.maximum-level", 25); configChanged = true; }
+        if (configChanged) plugin.saveConfig();
         Bukkit.getPluginManager().registerEvents(this, plugin);
         for (Player player : Bukkit.getOnlinePlayers()) {
             syncLifetimePlaytime(player);
@@ -199,7 +200,7 @@ public final class SurvivalFeatureManager implements Listener {
         // The header/footer stay clean and show this viewer's own level and saved all-time playtime.
         player.setPlayerListHeaderFooter(
                 "§d§lXZH SURVIVAL\n§8━━━━━━━━━━━━━━━━",
-                "\n§6Monster Level: §d" + level + "§8/§d100 §8| §bPlay Time: §f" + formatPlaytime(lifetimeSeconds) + globalQuestFooter());
+                "\n§6Monster Level: §d" + level + "§8/§d25 §8| §bPlay Time: §f" + formatPlaytime(lifetimeSeconds) + globalQuestFooter());
     }
 
     private String globalQuestFooter() {
@@ -259,7 +260,7 @@ public final class SurvivalFeatureManager implements Listener {
     private int getMonsterLevel(Player player) {
         long seconds = playtimeSeconds.getOrDefault(player.getUniqueId(), 0L);
         long hoursPerLevel = 1L;
-        int maxLevel = Math.max(1, plugin.getConfig().getInt("mob-progression.maximum-level", 5));
+        int maxLevel = MAX_MONSTER_LEVEL;
         long progressedLevels = seconds / (hoursPerLevel * 3600L);
         return (int) Math.min(maxLevel, 1L + progressedLevels);
     }
@@ -318,26 +319,27 @@ public final class SurvivalFeatureManager implements Listener {
     private void applyMonsterProgression(Monster monster, int level) {
         int speedStart = Math.max(1, plugin.getConfig().getInt("mob-progression.speed-effect-start-level", 15));
         if (level >= speedStart) {
-            int amplifier = level >= 60 ? 1 : 0;
+            int amplifier = level >= 18 ? 1 : 0;
             monster.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 20 * 60 * 10, amplifier, true, false, false));
         }
         if (level >= 3) {
             AttributeInstance maxHealth = monster.getAttribute(Attribute.MAX_HEALTH);
             if (maxHealth != null) {
                 double original = maxHealth.getBaseValue();
-                double bonus = Math.min(6.0, (level - 2) * 2.0);
-                maxHealth.setBaseValue(Math.min(30.0, original + bonus));
+                double bonus = Math.min(18.0, (level - 2) * 0.75);
+                maxHealth.setBaseValue(original + bonus);
                 monster.setHealth(maxHealth.getValue());
             }
         }
 
-        if (level < 2 || random.nextDouble() > Math.min(0.45, 0.12 + (level - 2) * 0.11)) return;
+        if (level < 2 || random.nextDouble() > Math.min(0.85, 0.12 + (level - 2) * 0.03)) return;
         var equipment = monster.getEquipment();
         if (equipment == null) return;
 
         String armorTier;
-        if (level == 2) armorTier = "CHAINMAIL";
-        else if (level >= 5 && random.nextDouble() < 0.12) armorTier = "DIAMOND";
+        if (level < 4) armorTier = "CHAINMAIL";
+        else if (level >= 20 && random.nextDouble() < 0.25) armorTier = "NETHERITE";
+        else if (level >= 12 && random.nextDouble() < 0.45) armorTier = "DIAMOND";
         else armorTier = "IRON";
 
         Material[] helmets = {Material.valueOf(armorTier + "_HELMET")};
@@ -356,14 +358,14 @@ public final class SurvivalFeatureManager implements Listener {
         }
 
         ItemStack weapon = equipment.getItemInMainHand();
-        double weaponEnchantChance = Math.min(0.45, 0.06 + level * 0.004);
+        double weaponEnchantChance = Math.min(0.85, 0.08 + level * 0.025);
         if (level >= 3 && weapon != null && !weapon.getType().isAir()
                 && random.nextDouble() < weaponEnchantChance) {
             if (weapon.getType() == Material.BOW) {
                 addEnchantment(weapon, "power", 1);
                 if (level >= 20 && random.nextDouble() < 0.15) addEnchantment(weapon, "flame", 1);
             } else {
-                addEnchantment(weapon, "sharpness", level >= 30 && random.nextDouble() < 0.15 ? 2 : 1);
+                addEnchantment(weapon, "sharpness", level >= 20 ? 3 : level >= 10 ? 2 : 1);
                 if (level >= 20 && random.nextDouble() < 0.10) addEnchantment(weapon, "fire_aspect", 1);
                 if (level >= 35 && random.nextDouble() < 0.10) addEnchantment(weapon, "knockback", 1);
             }
@@ -375,10 +377,10 @@ public final class SurvivalFeatureManager implements Listener {
             ItemStack chestplateItem = equipment.getChestplate();
             ItemStack leggingsItem = equipment.getLeggings();
             ItemStack bootsItem = equipment.getBoots();
-            enchantArmor(helmetItem);
-            enchantArmor(chestplateItem);
-            enchantArmor(leggingsItem);
-            enchantArmor(bootsItem);
+            enchantArmor(helmetItem, level);
+            enchantArmor(chestplateItem, level);
+            enchantArmor(leggingsItem, level);
+            enchantArmor(bootsItem, level);
             equipment.setHelmet(helmetItem);
             equipment.setChestplate(chestplateItem);
             equipment.setLeggings(leggingsItem);
@@ -392,9 +394,9 @@ public final class SurvivalFeatureManager implements Listener {
         equipment.setDropChance(EquipmentSlot.OFF_HAND, 0.0f);
     }
 
-    private void enchantArmor(ItemStack armor) {
-        if (armor != null && !armor.getType().isAir() && random.nextDouble() < 0.15) {
-            addEnchantment(armor, "protection", 1);
+    private void enchantArmor(ItemStack armor, int level) {
+        if (armor != null && !armor.getType().isAir() && random.nextDouble() < Math.min(0.85, 0.10 + level * 0.025)) {
+            addEnchantment(armor, "protection", level >= 20 ? 3 : level >= 10 ? 2 : 1);
         }
     }
 
