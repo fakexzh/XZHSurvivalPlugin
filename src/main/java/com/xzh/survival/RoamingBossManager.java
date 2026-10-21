@@ -42,6 +42,8 @@ public final class RoamingBossManager implements Listener {
     private final JavaPlugin plugin;
     private final NamespacedKey bossKey;
     private final NamespacedKey sealKey;
+    private final NamespacedKey bossTierKey;
+    private final NamespacedKey sealTierKey;
     private final Random random = new Random();
     private final Map<UUID, BossState> bosses = new HashMap<>();
     private final Map<UUID, Location> lastSpawnCheckLocation = new HashMap<>();
@@ -57,6 +59,8 @@ public final class RoamingBossManager implements Listener {
         this.plugin = plugin;
         this.bossKey = new NamespacedKey(plugin, "roaming_boss");
         this.sealKey = new NamespacedKey(plugin, "wanderers_seal");
+        this.bossTierKey = new NamespacedKey(plugin, "roaming_boss_tier");
+        this.sealTierKey = new NamespacedKey(plugin, "wanderers_seal_tier");
         Bukkit.getPluginManager().registerEvents(this, plugin);
     }
 
@@ -91,14 +95,15 @@ public final class RoamingBossManager implements Listener {
             double max = living.getAttribute(Attribute.MAX_HEALTH) == null
                     ? 40.0 : living.getAttribute(Attribute.MAX_HEALTH).getValue();
             state.bar.setProgress(Math.max(0.0, Math.min(1.0, living.getHealth() / Math.max(1.0, max))));
+            String tier = living.getPersistentDataContainer().getOrDefault(bossTierKey, PersistentDataType.STRING, "rare");
+            state.bar.setTitle(bossTitle(tier) + " §8• §c" + (int)Math.ceil(living.getHealth()) + "§7/§c" + (int)max + " HP");
             for (Player player : Bukkit.getOnlinePlayers()) {
                 if (player.getWorld().equals(living.getWorld())
                         && player.getLocation().distanceSquared(living.getLocation()) <= BOSSBAR_RANGE * BOSSBAR_RANGE) {
                     if (!state.bar.getPlayers().contains(player)) state.bar.addPlayer(player);
-                } else {
-                    state.bar.removePlayer(player);
-                }
+                } else state.bar.removePlayer(player);
             }
+            if (ticks % attackInterval(tier) == 0) launchSpecialAttack(living, tier);
         }
         if (!plugin.getConfig().getBoolean("roaming-bosses.enabled", true)) return;
         if (ticks % 30 != 0 || bosses.size() >= 3) return;
@@ -149,15 +154,20 @@ public final class RoamingBossManager implements Listener {
             };
             Entity entity = world.spawnEntity(spawn, type);
             if (!(entity instanceof LivingEntity living)) { entity.remove(); continue; }
+            String tier = rollTier();
+            double hp = tier.equals("legendary") ? 180.0 : tier.equals("rare") ? 120.0 : 80.0;
             if (living.getAttribute(Attribute.MAX_HEALTH) != null) {
-                living.getAttribute(Attribute.MAX_HEALTH).setBaseValue(40.0);
-                living.setHealth(40.0);
+                living.getAttribute(Attribute.MAX_HEALTH).setBaseValue(hp);
+                living.setHealth(hp);
             }
-            living.setCustomName("§d§lWandering Boss");
+            if (living.getAttribute(Attribute.ATTACK_DAMAGE) != null) living.getAttribute(Attribute.ATTACK_DAMAGE).setBaseValue(tier.equals("legendary") ? 12.0 : tier.equals("rare") ? 9.0 : 6.0);
+            if (living.getAttribute(Attribute.MOVEMENT_SPEED) != null) living.getAttribute(Attribute.MOVEMENT_SPEED).setBaseValue(tier.equals("legendary") ? 0.34 : tier.equals("rare") ? 0.31 : 0.28);
+            living.setCustomName(bossTitle(tier));
             living.setCustomNameVisible(true);
             living.setGlowing(true);
             living.setRemoveWhenFarAway(false);
             living.getPersistentDataContainer().set(bossKey, PersistentDataType.BYTE, (byte) 1);
+            living.getPersistentDataContainer().set(bossTierKey, PersistentDataType.STRING, tier);
             return living;
         }
         return null;
@@ -165,7 +175,8 @@ public final class RoamingBossManager implements Listener {
 
     private void trackBoss(LivingEntity boss) {
         if (bosses.containsKey(boss.getUniqueId())) return;
-        BossBar bar = Bukkit.createBossBar("§dKill the boss and collect the key.", BarColor.PURPLE, BarStyle.SOLID);
+        String tier = boss.getPersistentDataContainer().getOrDefault(bossTierKey, PersistentDataType.STRING, "rare");
+        BossBar bar = Bukkit.createBossBar(bossTitle(tier), tier.equals("legendary") ? BarColor.RED : tier.equals("rare") ? BarColor.PURPLE : BarColor.BLUE, BarStyle.SOLID);
         bar.setVisible(true);
         bosses.put(boss.getUniqueId(), new BossState(boss.getUniqueId(), bar));
     }
@@ -176,17 +187,18 @@ public final class RoamingBossManager implements Listener {
         if (!entity.getPersistentDataContainer().has(bossKey, PersistentDataType.BYTE)) return;
         BossState state = bosses.remove(entity.getUniqueId());
         if (state != null) state.bar.removeAll();
-        ItemStack seal = new ItemStack(Material.TRIPWIRE_HOOK);
+        String tier = entity.getPersistentDataContainer().getOrDefault(bossTierKey, PersistentDataType.STRING, "rare");
+        int reward = rewardForTier(tier);
+        ItemStack seal = new ItemStack(Material.TRIAL_KEY);
         ItemMeta meta = seal.getItemMeta();
-        meta.setDisplayName("§d§lWanderer's Seal");
-        meta.setLore(List.of("§7A seal dropped by a roaming boss.", "§eBring it to a smith villager and right-click to redeem."));
+        meta.setDisplayName("§d§l" + tierName(tier) + " Boss Reward Key");
+        meta.setLore(List.of("§7Earned by defeating a " + tierName(tier) + " roaming boss.", "§7Reward: §e" + reward + " bank coins", "§eBring this key to a Smith Villager", "§eand right-click to claim your reward."));
         meta.getPersistentDataContainer().set(sealKey, PersistentDataType.BYTE, (byte) 1);
+        meta.getPersistentDataContainer().set(sealTierKey, PersistentDataType.STRING, tier);
         seal.setItemMeta(meta);
         event.getDrops().add(seal);
         Player killer = entity.getKiller();
-        if (killer != null) {
-            killer.sendMessage("§d§lWANDERER'S SEAL §8» §fBring the key to an armorer, weaponsmith, or toolsmith villager and right-click while holding it to claim your bank reward.");
-        }
+        if (killer != null) killer.sendMessage("§d§lBOSS DEFEATED §8» §fYou received a §d" + tierName(tier) + " Boss Reward Key§f worth §e" + reward + " bank coins§f. Bring it to an Armorer, Weaponsmith, or Toolsmith and right-click to redeem.");
     }
 
     @EventHandler(ignoreCancelled = true)
@@ -200,15 +212,33 @@ public final class RoamingBossManager implements Listener {
         if (held.getType().isAir() || !held.hasItemMeta()
                 || !held.getItemMeta().getPersistentDataContainer().has(sealKey, PersistentDataType.BYTE)) return;
         event.setCancelled(true);
-        int reward = Math.max(1, plugin.getConfig().getInt("roaming-bosses.bank-reward", 750));
+        String tier = held.getItemMeta().getPersistentDataContainer().getOrDefault(sealTierKey, PersistentDataType.STRING, "common");
+        int reward = rewardForTier(tier);
         if (!depositToBank(player.getUniqueId(), reward)) {
-            player.sendMessage("§cYour seal was not consumed because the XZH Bank could not be reached.");
+            player.sendMessage("§cYour key was not consumed because the XZH Bank could not be reached.");
             return;
         }
         if (held.getAmount() <= 1) player.getInventory().setItemInMainHand(null);
         else held.setAmount(held.getAmount() - 1);
-        player.sendMessage("§aWanderer's Seal redeemed! §e" + reward + " coins §awere deposited directly into your bank.");
-        Bukkit.broadcastMessage("§d[XZH Exploration] §f" + player.getName() + " redeemed a Wanderer's Seal for " + reward + " bank coins.");
+        player.sendMessage("§a" + tierName(tier) + " Boss Reward Key redeemed! §e" + reward + " coins §awere deposited directly into your bank.");
+        Bukkit.broadcastMessage("§d[XZH Exploration] §f" + player.getName() + " redeemed a " + tierName(tier) + " Boss Reward Key for " + reward + " bank coins.");
+    }
+
+    private String rollTier() { int roll = random.nextInt(100); return roll < 55 ? "common" : roll < 88 ? "rare" : "legendary"; }
+    private String tierName(String tier) { return switch (tier.toLowerCase(java.util.Locale.ROOT)) { case "legendary" -> "Legendary"; case "rare" -> "Rare"; default -> "Common"; }; }
+    private String bossTitle(String tier) { return switch (tier.toLowerCase(java.util.Locale.ROOT)) { case "legendary" -> "§4§lLEGENDARY ROAMING BOSS"; case "rare" -> "§5§lRARE ROAMING BOSS"; default -> "§9§lCOMMON ROAMING BOSS"; }; }
+    private int rewardForTier(String tier) { String key = tier.toLowerCase(java.util.Locale.ROOT); int fallback = key.equals("legendary") ? 2500 : key.equals("rare") ? 1200 : 500; return Math.max(1, plugin.getConfig().getInt("roaming-bosses.rewards." + key, plugin.getConfig().getInt("roaming-bosses.bank-reward", fallback))); }
+    private long attackInterval(String tier) { return tier.equals("legendary") ? 3L : tier.equals("rare") ? 4L : 5L; }
+    private void launchSpecialAttack(LivingEntity boss, String tier) {
+        Player target = null; double best = 24.0 * 24.0;
+        for (Player player : boss.getWorld().getPlayers()) { double d = player.getLocation().distanceSquared(boss.getLocation()); if (d < best && player.getGameMode() != org.bukkit.GameMode.SPECTATOR) { best = d; target = player; } }
+        if (target == null) return;
+        Location origin = boss.getEyeLocation(); Vector direction = target.getEyeLocation().toVector().subtract(origin.toVector()).normalize();
+        int attack = random.nextInt(tier.equals("legendary") ? 4 : tier.equals("rare") ? 3 : 2);
+        if (attack == 0) { org.bukkit.entity.SmallFireball fire = boss.getWorld().spawn(origin.add(direction.clone().multiply(1.2)), org.bukkit.entity.SmallFireball.class); fire.setDirection(direction); fire.setShooter(boss); }
+        else if (attack == 1) { org.bukkit.entity.Arrow arrow = boss.getWorld().spawnArrow(origin.add(direction.clone().multiply(1.2)), direction, tier.equals("legendary") ? 2.8f : 2.2f, 3.0f); arrow.setShooter(boss); arrow.setFireTicks(80); arrow.setDamage(tier.equals("legendary") ? 6.0 : 3.5); }
+        else if (attack == 2) { Location blast = target.getLocation().clone(); boss.getWorld().spawnParticle(org.bukkit.Particle.FLAME, blast.clone().add(0, 0.8, 0), 18, 0.45, 0.5, 0.45, 0.02); boss.getWorld().playSound(blast, org.bukkit.Sound.ENTITY_CREEPER_PRIMED, 1.0f, 0.8f); org.bukkit.entity.TNTPrimed tnt = boss.getWorld().spawn(blast, org.bukkit.entity.TNTPrimed.class); tnt.setFuseTicks(50); tnt.setYield(tier.equals("legendary") ? 3.0f : 2.0f); tnt.setSource(boss); }
+        else { org.bukkit.entity.Fireball fire = boss.getWorld().spawn(origin.add(direction.clone().multiply(1.2)), org.bukkit.entity.Fireball.class); fire.setDirection(direction); fire.setYield(1.5f); fire.setIsIncendiary(true); fire.setShooter(boss); }
     }
 
     private boolean depositToBank(UUID playerId, int amount) {
