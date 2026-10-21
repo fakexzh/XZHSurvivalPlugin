@@ -283,7 +283,7 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
         }
 
         boolean challenging = !c.tier.equals("common");
-        Location spawn = challenging ? buildBountyChamber(world, floor, c.dimension) : floor.clone().add(0.5, 1, 0.5);
+        Location spawn = challenging && isSafeCampSite(world, floor) ? buildBountyChamber(world, floor, c.dimension) : floor.clone().add(0.5, 1, 0.5);
         EntityType type;
         if (c.dimension.equals("nether")) {
             type = switch (c.tier) {
@@ -376,8 +376,19 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
         boss.addPotionEffect(new org.bukkit.potion.PotionEffect(org.bukkit.potion.PotionEffectType.SPEED, 12000, tier.equals("legendary") ? 2 : tier.equals("rare") ? 1 : 0, true, false, false));
         if (!tier.equals("common")) boss.addPotionEffect(new org.bukkit.potion.PotionEffect(org.bukkit.potion.PotionEffectType.RESISTANCE, 12000, tier.equals("legendary") ? 1 : 0, true, false, false));
     }
-    private Location buildBountyChamber(World world, Location floor, String dimension) {
+    private boolean isSafeCampSite(World world, Location floor) {
         int x = floor.getBlockX(), y = floor.getBlockY(), z = floor.getBlockZ();
+        for (int dx = -6; dx <= 6; dx++) for (int dz = -6; dz <= 6; dz++) {
+            for (int dy = -6; dy <= 5; dy++) {
+                Material type = world.getBlockAt(x + dx, y + dy, z + dz).getType();
+                if (type.isAir() || type == Material.GRASS_BLOCK || type == Material.DIRT || type == Material.COARSE_DIRT || type == Material.ROOTED_DIRT || type == Material.STONE || type == Material.DEEPSLATE || type == Material.ANDESITE || type == Material.DIORITE || type == Material.GRANITE || type == Material.TUFF || type == Material.GRAVEL || type == Material.SAND || type == Material.RED_SAND || type == Material.SNOW || type == Material.SHORT_GRASS || type == Material.TALL_GRASS || type == Material.FERN || type == Material.DEAD_BUSH || type == Material.WATER) continue;
+                return false;
+            }
+        }
+        return true;
+    }
+    private Location buildBountyChamber(World world, Location floor, String dimension) {
+        int x = floor.getBlockX(), y = floor.getBlockY() - 5, z = floor.getBlockZ();
         Material brick = dimension.equals("nether") ? Material.POLISHED_BLACKSTONE_BRICKS : Material.STONE_BRICKS;
         Material trim = dimension.equals("nether") ? Material.NETHER_BRICKS : Material.CRACKED_STONE_BRICKS;
         // A compact, open-front combat chamber makes Rare and Legendary hunts feel distinct.
