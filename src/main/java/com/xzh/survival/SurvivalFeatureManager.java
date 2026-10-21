@@ -262,7 +262,7 @@ public final class SurvivalFeatureManager implements Listener {
         long hoursPerLevel = 1L;
         int maxLevel = MAX_MONSTER_LEVEL;
         long progressedLevels = seconds / (hoursPerLevel * 3600L);
-        return (int) Math.min(maxLevel, 1L + progressedLevels);
+        return (int) Math.max(1L, Math.min(maxLevel, progressedLevels));
     }
 
     private Player findNearestPlayer(Location location, double maxDistance) {
