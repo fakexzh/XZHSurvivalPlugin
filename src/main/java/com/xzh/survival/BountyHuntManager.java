@@ -311,6 +311,7 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
             living.setHealth(hp);
         }
         living.setRemoveWhenFarAway(false);
+        equipBountyBoss(living, c.tier);
 
         if (challenging) {
             int backupCount = c.tier.equals("legendary") ? 4 : 2;
@@ -332,6 +333,21 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
         }
     }
 
+    private void equipBountyBoss(LivingEntity boss, String tier) {
+        var equipment = boss.getEquipment();
+        if (equipment == null) return;
+        String metal = tier.equals("legendary") ? "NETHERITE" : tier.equals("rare") ? "DIAMOND" : "IRON";
+        int level = tier.equals("legendary") ? 4 : tier.equals("rare") ? 3 : 2;
+        ItemStack[] armor = { new ItemStack(Material.valueOf(metal + "_HELMET")), new ItemStack(Material.valueOf(metal + "_CHESTPLATE")), new ItemStack(Material.valueOf(metal + "_LEGGINGS")), new ItemStack(Material.valueOf(metal + "_BOOTS")) };
+        for (ItemStack piece : armor) { piece.addUnsafeEnchantment(org.bukkit.enchantments.Enchantment.PROTECTION, level); piece.addUnsafeEnchantment(org.bukkit.enchantments.Enchantment.UNBREAKING, 3); }
+        equipment.setHelmet(armor[0]); equipment.setChestplate(armor[1]); equipment.setLeggings(armor[2]); equipment.setBoots(armor[3]);
+        ItemStack shield = new ItemStack(Material.SHIELD); shield.addUnsafeEnchantment(org.bukkit.enchantments.Enchantment.UNBREAKING, 3); equipment.setItemInOffHand(shield);
+        if (boss instanceof Skeleton || boss instanceof Pillager || boss instanceof Stray) { ItemStack bow = new ItemStack(Material.BOW); bow.addUnsafeEnchantment(org.bukkit.enchantments.Enchantment.POWER, level); if (!tier.equals("common")) bow.addUnsafeEnchantment(org.bukkit.enchantments.Enchantment.FLAME, 1); equipment.setItemInMainHand(bow); }
+        else { ItemStack sword = new ItemStack(Material.valueOf(metal + "_SWORD")); sword.addUnsafeEnchantment(org.bukkit.enchantments.Enchantment.SHARPNESS, level); sword.addUnsafeEnchantment(org.bukkit.enchantments.Enchantment.FIRE_ASPECT, tier.equals("legendary") ? 2 : 1); equipment.setItemInMainHand(sword); }
+        for (org.bukkit.inventory.EquipmentSlot slot : List.of(org.bukkit.inventory.EquipmentSlot.HEAD, org.bukkit.inventory.EquipmentSlot.CHEST, org.bukkit.inventory.EquipmentSlot.LEGS, org.bukkit.inventory.EquipmentSlot.FEET, org.bukkit.inventory.EquipmentSlot.HAND, org.bukkit.inventory.EquipmentSlot.OFF_HAND)) equipment.setDropChance(slot, 0.0f);
+        boss.addPotionEffect(new org.bukkit.potion.PotionEffect(org.bukkit.potion.PotionEffectType.SPEED, 12000, tier.equals("legendary") ? 2 : tier.equals("rare") ? 1 : 0, true, false, false));
+        if (!tier.equals("common")) boss.addPotionEffect(new org.bukkit.potion.PotionEffect(org.bukkit.potion.PotionEffectType.RESISTANCE, 12000, tier.equals("legendary") ? 1 : 0, true, false, false));
+    }
     private Location buildBountyChamber(World world, Location floor, String dimension) {
         int x = floor.getBlockX(), y = floor.getBlockY(), z = floor.getBlockZ();
         Material brick = dimension.equals("nether") ? Material.POLISHED_BLACKSTONE_BRICKS : Material.STONE_BRICKS;
