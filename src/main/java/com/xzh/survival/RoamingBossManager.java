@@ -7,6 +7,9 @@ import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.World;
 import org.bukkit.attribute.Attribute;
+import org.bukkit.enchantments.Enchantment;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 import org.bukkit.boss.BarColor;
 import org.bukkit.boss.BarStyle;
 import org.bukkit.boss.BossBar;
@@ -169,6 +172,7 @@ public final class RoamingBossManager implements Listener {
             living.setRemoveWhenFarAway(false);
             living.getPersistentDataContainer().set(bossKey, PersistentDataType.BYTE, (byte) 1);
             living.getPersistentDataContainer().set(bossTierKey, PersistentDataType.STRING, tier);
+            equipBoss(living, tier);
             return living;
         }
         return null;
@@ -229,6 +233,30 @@ public final class RoamingBossManager implements Listener {
     private String tierName(String tier) { return switch (tier.toLowerCase(java.util.Locale.ROOT)) { case "legendary" -> "Legendary"; case "rare" -> "Rare"; default -> "Common"; }; }
     private String bossTitle(String tier) { return switch (tier.toLowerCase(java.util.Locale.ROOT)) { case "legendary" -> "§4§lLEGENDARY ROAMING BOSS"; case "rare" -> "§5§lRARE ROAMING BOSS"; default -> "§9§lCOMMON ROAMING BOSS"; }; }
     private int rewardForTier(String tier) { int min = Math.max(50, plugin.getConfig().getInt("roaming-bosses.minimum-bank-reward", 50)); int max = Math.max(min, Math.min(500, plugin.getConfig().getInt("roaming-bosses.maximum-bank-reward", 500))); return min + random.nextInt(max - min + 1); }
+    private void equipBoss(LivingEntity boss, String tier) {
+        var gear = boss.getEquipment();
+        if (gear == null) return;
+        String material = tier.equals("legendary") ? "NETHERITE" : tier.equals("rare") ? "DIAMOND" : "IRON";
+        int enchantLevel = tier.equals("legendary") ? 4 : tier.equals("rare") ? 3 : 2;
+        ItemStack[] armor = {new ItemStack(Material.valueOf(material+"_HELMET")), new ItemStack(Material.valueOf(material+"_CHESTPLATE")), new ItemStack(Material.valueOf(material+"_LEGGINGS")), new ItemStack(Material.valueOf(material+"_BOOTS"))};
+        for (ItemStack item : armor) { enchant(item, "protection", enchantLevel); enchant(item, "unbreaking", 3); }
+        gear.setHelmet(armor[0]); gear.setChestplate(armor[1]); gear.setLeggings(armor[2]); gear.setBoots(armor[3]);
+        ItemStack shield = new ItemStack(Material.SHIELD); enchant(shield, "unbreaking", 3); gear.setItemInOffHand(shield);
+        boolean ranged = boss.getType() == EntityType.SKELETON || boss.getType() == EntityType.STRAY;
+        ItemStack weapon = new ItemStack(ranged ? Material.BOW : tier.equals("legendary") ? Material.NETHERITE_SWORD : tier.equals("rare") ? Material.DIAMOND_SWORD : Material.IRON_SWORD);
+        enchant(weapon, ranged ? "power" : "sharpness", enchantLevel);
+        if (!tier.equals("common")) enchant(weapon, ranged ? "flame" : "fire_aspect", tier.equals("legendary") ? 2 : 1);
+        gear.setItemInMainHand(weapon);
+        for (EquipmentSlot slot : List.of(EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET, EquipmentSlot.HAND, EquipmentSlot.OFF_HAND)) gear.setDropChance(slot, 0.0f);
+        boss.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 12000, tier.equals("legendary") ? 2 : tier.equals("rare") ? 1 : 0, true, false, false));
+        if (tier.equals("legendary")) boss.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 12000, 0, true, false, false));
+    }
+
+    private void enchant(ItemStack item, String key, int level) {
+        Enchantment enchantment = Enchantment.getByKey(NamespacedKey.minecraft(key));
+        if (enchantment != null) item.addUnsafeEnchantment(enchantment, level);
+    }
+
     private long attackInterval(String tier) { return tier.equals("legendary") ? 3L : tier.equals("rare") ? 4L : 5L; }
     private void launchSpecialAttack(LivingEntity boss, String tier) {
         Player target = null; double best = 24.0 * 24.0;
