@@ -2,8 +2,6 @@ package com.xzh.survival;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
-import org.bukkit.enchantments.Enchantment;
-import org.bukkit.inventory.meta.EnchantmentStorageMeta;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
@@ -60,7 +58,7 @@ public final class DynamicTradingManager implements Listener {
             for (MerchantRecipe recipe : merchant.getRecipes()) {
                 ItemStack result = recipe.getResult();
                 ItemMeta meta = result.getItemMeta();
-                if (entity instanceof Villager && result.getType() == Material.ENCHANTED_BOOK) continue;
+                if (containsBookTradeItem(recipe)) continue;
                 if (meta == null || !meta.getPersistentDataContainer().has(specialKey, PersistentDataType.BYTE)) copy.add(recipe);
             }
             return copy;
@@ -103,7 +101,7 @@ public final class DynamicTradingManager implements Listener {
         // Limited rotating stock: a player can buy each special item once per refresh cycle.
         Material[] stockPool = wandering
                 ? new Material[]{Material.SADDLE, Material.NAME_TAG, Material.IRON_HORSE_ARMOR, Material.GOLDEN_HORSE_ARMOR}
-                : new Material[]{Material.NAME_TAG, Material.ENCHANTED_BOOK, Material.SADDLE, Material.GOLDEN_APPLE};
+                : new Material[]{Material.NAME_TAG, Material.SADDLE, Material.GOLDEN_APPLE, Material.IRON_HORSE_ARMOR};
         Material selectedStock = stockPool[random.nextInt(stockPool.length)];
         ItemStack stock = new ItemStack(selectedStock, 1);
         ItemMeta meta = stock.getItemMeta();
@@ -113,14 +111,8 @@ public final class DynamicTradingManager implements Listener {
             stock.setItemMeta(meta);
         }
         addOffer(offers, stock, createOfficialCoin(10, 1));
-        ItemStack rare = new ItemStack(wandering ? Material.EXPERIENCE_BOTTLE : Material.ENCHANTED_BOOK, 1);
-        if (!wandering && rare.getItemMeta() instanceof EnchantmentStorageMeta bookMeta) {
-            Enchantment[] choices = {Enchantment.MENDING, Enchantment.UNBREAKING, Enchantment.EFFICIENCY,
-                    Enchantment.FORTUNE, Enchantment.SILK_TOUCH, Enchantment.PROTECTION, Enchantment.SHARPNESS};
-            Enchantment enchantment = choices[random.nextInt(choices.length)];
-            bookMeta.addStoredEnchant(enchantment, Math.min(enchantment.getMaxLevel(), 1 + random.nextInt(enchantment.getMaxLevel())), true);
-            rare.setItemMeta(bookMeta);
-        }
+        // Both trader types use a non-book limited reward; book trades are disabled globally.
+        ItemStack rare = new ItemStack(Material.EXPERIENCE_BOTTLE, 1);
         ItemMeta rareMeta = rare.getItemMeta();
         if (rareMeta != null) {
             rareMeta.setDisplayName("§5Limited XZH Supply");
@@ -129,6 +121,18 @@ public final class DynamicTradingManager implements Listener {
         }
         addOffer(offers, rare, createOfficialCoin(10, 1));
         return offers;
+    }
+
+    private boolean containsBookTradeItem(MerchantRecipe recipe) {
+        if (isBookMaterial(recipe.getResult().getType())) return true;
+        for (ItemStack ingredient : recipe.getIngredients()) {
+            if (ingredient != null && isBookMaterial(ingredient.getType())) return true;
+        }
+        return false;
+    }
+
+    private boolean isBookMaterial(Material material) {
+        return material.name().contains("BOOK");
     }
 
     private void addOffer(List<MerchantRecipe> offers, ItemStack result, ItemStack cost) {
