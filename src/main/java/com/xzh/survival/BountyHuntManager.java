@@ -32,7 +32,7 @@ import java.util.*;
 
 public final class BountyHuntManager implements Listener, org.bukkit.command.CommandExecutor {
     private final JavaPlugin plugin;
-    private final NamespacedKey bountyTierKey, contractOwnerKey, bowKey, arrowKey, targetKey, trackingCompassKey;
+    private final NamespacedKey bountyTierKey, contractOwnerKey, bowKey, arrowKey, targetKey, trackingCompassKey, bountyExplosiveKey;
     private final File dataFile;
     private final org.bukkit.configuration.file.YamlConfiguration data = new org.bukkit.configuration.file.YamlConfiguration();
     private final File cooldownFile;
@@ -47,6 +47,7 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
         double x, y, z, entryPrice;
         int rewardPercent;
         long remainingSeconds, lastSavedAt;
+        int combatTicks;
         Contract(UUID owner, String tier, long seconds) { this.owner=owner; this.tier=tier; this.remainingSeconds=seconds; this.rewardPercent=30 + new Random().nextInt(31); }
     }
 
@@ -57,6 +58,7 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
         bowKey = new NamespacedKey(plugin, "hunter_bow");
         arrowKey = new NamespacedKey(plugin, "tracking_arrow");
         trackingCompassKey = new NamespacedKey(plugin, "tracking_compass");
+        bountyExplosiveKey = new NamespacedKey(plugin, "bounty_explosive");
         targetKey = new NamespacedKey(plugin, "bounty_target");
         dataFile = new File(plugin.getDataFolder(), "bounties.yml");
         cooldownFile = new File(plugin.getDataFolder(), "bounty-cooldowns.yml");
@@ -333,6 +335,32 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
         }
     }
 
+    private void runBountyCombatAbilities(Contract contract, LivingEntity boss, Player target) {
+        if (contract.combatTicks % 10 == 0) {
+            Vector direction = target.getEyeLocation().toVector().subtract(boss.getEyeLocation().toVector());
+            if (direction.lengthSquared() > 0.1) {
+                Fireball fire = boss.getWorld().spawn(boss.getEyeLocation().add(direction.clone().normalize()), Fireball.class);
+                fire.setShooter(boss); fire.setDirection(direction.normalize()); fire.setYield(0.0f); fire.setIsIncendiary(true);
+            }
+        }
+        if (contract.combatTicks % 25 == 0) {
+            Location blast = target.getLocation().clone().add((random.nextDouble() - 0.5) * 4.0, 0.0, (random.nextDouble() - 0.5) * 4.0);
+            if (blast.getBlock().isPassable() && blast.clone().add(0, 1, 0).getBlock().isPassable()) {
+                TNTPrimed tnt = boss.getWorld().spawn(blast, TNTPrimed.class);
+                tnt.setFuseTicks(45); tnt.setYield(3.0f); tnt.setIsIncendiary(true);
+                tnt.getPersistentDataContainer().set(bountyExplosiveKey, PersistentDataType.BYTE, (byte) 1);
+            }
+        }
+        if (contract.combatTicks % 35 == 0) {
+            Vector leap = target.getLocation().toVector().subtract(boss.getLocation().toVector());
+            if (leap.lengthSquared() > 0.1) boss.setVelocity(leap.normalize().multiply(0.7).setY(0.65));
+        }
+    }
+
+    @EventHandler
+    public void protectBlocksFromBountyExplosives(org.bukkit.event.entity.EntityExplodeEvent event) {
+        if (event.getEntity() instanceof TNTPrimed tnt && tnt.getPersistentDataContainer().has(bountyExplosiveKey, PersistentDataType.BYTE)) event.blockList().clear();
+    }
     private void equipBountyBoss(LivingEntity boss, String tier) {
         var equipment = boss.getEquipment();
         if (equipment == null) return;
@@ -434,6 +462,8 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
             Entity activeTarget = c.target == null ? null : Bukkit.getEntity(c.target);
             if (activeTarget instanceof LivingEntity living && !living.isDead()) {
                 refreshContractBossBar(c, living);
+                c.combatTicks++;
+                if (p.getWorld() == living.getWorld() && p.getLocation().distanceSquared(living.getLocation()) <= 32.0 * 32.0) runBountyCombatAbilities(c, living, p);
                 if (p.getWorld() == living.getWorld()) {
                     p.setCompassTarget(living.getLocation());
                     double dx = living.getLocation().getX() - p.getLocation().getX();
