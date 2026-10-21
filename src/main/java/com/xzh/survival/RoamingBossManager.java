@@ -62,8 +62,7 @@ public final class RoamingBossManager implements Listener {
     private Location lastSpawnLocation;
     private static final long UNENGAGED_DESPAWN_MILLIS = 5L * 60L * 1000L;
     private static final long ENGAGED_DESPAWN_MILLIS = 10L * 60L * 1000L;
-    private static final long MIN_PLAYER_COOLDOWN_MILLIS = 30L * 60L * 1000L;
-    private static final long MAX_PLAYER_COOLDOWN_MILLIS = 45L * 60L * 1000L;
+    private static final long PLAYER_COOLDOWN_MILLIS = 2L * 60L * 60L * 1000L;
     private static final double DESPAWN_NEARBY_RANGE = 64.0;
     private static final double SPAWN_SEPARATION_BLOCKS = 500.0;
 
@@ -160,8 +159,7 @@ public final class RoamingBossManager implements Listener {
         for (Player player : Bukkit.getOnlinePlayers()) {
             long now = System.currentTimeMillis();
             if (!playerCooldownUntil.containsKey(player.getUniqueId())) {
-                long initialDelay = MIN_PLAYER_COOLDOWN_MILLIS + (long)(random.nextDouble() * (MAX_PLAYER_COOLDOWN_MILLIS - MIN_PLAYER_COOLDOWN_MILLIS + 1L));
-                playerCooldownUntil.put(player.getUniqueId(), now + initialDelay);
+                playerCooldownUntil.put(player.getUniqueId(), now + PLAYER_COOLDOWN_MILLIS);
                 continue;
             }
             if (playerCooldownUntil.getOrDefault(player.getUniqueId(), 0L) > now) continue;
@@ -188,8 +186,7 @@ public final class RoamingBossManager implements Listener {
     private void finishPlayerCooldown(UUID bossId) {
         UUID owner = encounterOwnerByBoss.remove(bossId);
         if (owner == null) return;
-        long duration = MIN_PLAYER_COOLDOWN_MILLIS + (long)(random.nextDouble() * (MAX_PLAYER_COOLDOWN_MILLIS - MIN_PLAYER_COOLDOWN_MILLIS + 1L));
-        playerCooldownUntil.put(owner, System.currentTimeMillis() + duration);
+        playerCooldownUntil.put(owner, System.currentTimeMillis() + PLAYER_COOLDOWN_MILLIS);
     }
 
     private boolean hasBossInWorld(World world) {
@@ -214,6 +211,8 @@ public final class RoamingBossManager implements Listener {
             Material ground = world.getBlockAt(x, y - 1, z).getType();
             if (!ground.isSolid() || !spawn.getBlock().isPassable()
                     || !spawn.clone().add(0, 1, 0).getBlock().isPassable()) continue;
+            // Keep roaming bosses away from player-lit areas and strong natural light sources.
+            if (isLitSpawnArea(spawn)) continue;
             EntityType type = switch (random.nextInt(4)) {
                 case 0 -> EntityType.ZOMBIE;
                 case 1 -> EntityType.SKELETON;
@@ -293,6 +292,33 @@ public final class RoamingBossManager implements Listener {
         else held.setAmount(held.getAmount() - 1);
         player.sendMessage("§a" + tierName(tier) + " Boss Reward Key redeemed! §e" + reward + " coins §awere deposited directly into your bank.");
         Bukkit.broadcastMessage("§d[XZH Exploration] §f" + player.getName() + " redeemed a " + tierName(tier) + " Boss Reward Key for " + reward + " bank coins.");
+    }
+
+    private boolean isLitSpawnArea(Location spawn) {
+        World world = spawn.getWorld();
+        if (world == null) return true;
+
+        // Do not spawn directly in a block-lit area.
+        if (spawn.getBlock().getLightFromBlocks() >= 8
+                || spawn.clone().add(0, 1, 0).getBlock().getLightFromBlocks() >= 8) {
+            return true;
+        }
+
+        // Reject locations within roughly eight blocks of strong light sources,
+        // including torches, lanterns, glowstone, sea lanterns, and similar blocks.
+        int centerX = spawn.getBlockX();
+        int centerY = spawn.getBlockY();
+        int centerZ = spawn.getBlockZ();
+        for (int x = centerX - 8; x <= centerX + 8; x++) {
+            for (int y = centerY - 3; y <= centerY + 3; y++) {
+                if (y < world.getMinHeight() || y >= world.getMaxHeight()) continue;
+                for (int z = centerZ - 8; z <= centerZ + 8; z++) {
+                    Block block = world.getBlockAt(x, y, z);
+                    if (block.getLightFromBlocks() >= 12) return true;
+                }
+            }
+        }
+        return false;
     }
 
     private String rollTier() { int roll = random.nextInt(100); return roll < 55 ? "common" : roll < 88 ? "rare" : "legendary"; }
