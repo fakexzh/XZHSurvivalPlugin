@@ -353,7 +353,7 @@ public final class BountyHuntManager implements Listener, org.bukkit.command.Com
         }
         if (contract.combatTicks % 35 == 0) {
             Vector leap = target.getLocation().toVector().subtract(boss.getLocation().toVector());
-            if (leap.lengthSquared() > 0.1) boss.setVelocity(leap.normalize().multiply(0.7).setY(0.65));
+            if (leap.lengthSquared() > 0.1) { boss.setGravity(false); boss.setVelocity(leap.normalize().multiply(0.7).setY(0.65)); Bukkit.getScheduler().runTaskLater(plugin, () -> { if (boss.isValid()) boss.setGravity(true); }, 12L); }
         }
     }
 
