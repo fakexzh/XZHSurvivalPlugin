@@ -303,8 +303,12 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
             int high = getConfig().getInt("death." + dimension + ".maximum-bank-penalty");
             penalty = low + random.nextInt(Math.max(1, high - low + 1));
         }
-        deductBank(player, penalty);
-        player.sendMessage("§cDeath penalty: §f" + penalty + " coins from your bank. §7XP loss: " + percent + "%.");
+
+        // Replace vanilla's automatic death line with one consistent, global XZH announcement.
+        String vanillaDeathMessage = event.getDeathMessage();
+        event.setDeathMessage(null);
+        double actualPenalty = deductBank(player, penalty);
+        broadcastDeath(player, vanillaDeathMessage, actualPenalty, percent);
     }
 
     @EventHandler
@@ -336,11 +340,11 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         return min + (int) Math.round((max - min) * Math.min(1.0, distance / cap));
     }
 
-    private void deductBank(Player player, int requested) {
+    private double deductBank(Player player, int requested) {
         Plugin economy = Bukkit.getPluginManager().getPlugin("XZHEconomySystem");
         if (economy == null || !economy.isEnabled()) {
             getLogger().warning("XZHEconomySystem unavailable; skipped bank penalty for " + player.getName());
-            return;
+            return 0.0;
         }
         try {
             Method getManager = economy.getClass().getMethod("getBankManager");
@@ -348,11 +352,38 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
             Method getBalance = manager.getClass().getMethod("getBalance", UUID.class);
             Method setBalance = manager.getClass().getMethod("setBalance", UUID.class, double.class);
             double balance = ((Number) getBalance.invoke(manager, player.getUniqueId())).doubleValue();
-            double deduction = Math.min(Math.max(0, balance), requested);
-            setBalance.invoke(manager, player.getUniqueId(), Math.max(0, balance - deduction));
+            double safeBalance = Double.isFinite(balance) ? Math.max(0.0, balance) : 0.0;
+            double deduction = Math.min(safeBalance, Math.max(0, requested));
+            setBalance.invoke(manager, player.getUniqueId(), Math.max(0.0, safeBalance - deduction));
+            return deduction;
         } catch (ReflectiveOperationException | RuntimeException exception) {
             getLogger().warning("Could not access XZHEconomySystem bank API; skipped bank penalty: "
                     + exception.getClass().getSimpleName());
+            return 0.0;
         }
+    }
+
+    private void broadcastDeath(Player player, String vanillaMessage, double coinsLost, int xpPercent) {
+        String reason = "reason unavailable";
+        if (vanillaMessage != null && !vanillaMessage.isBlank()) {
+            String clean = org.bukkit.ChatColor.stripColor(vanillaMessage);
+            String displayName = org.bukkit.ChatColor.stripColor(player.getDisplayName());
+            if (displayName != null && clean.startsWith(displayName)) {
+                clean = clean.substring(displayName.length()).trim();
+            } else if (clean.startsWith(player.getName())) {
+                clean = clean.substring(player.getName().length()).trim();
+            }
+            if (clean.startsWith("was ")) clean = clean.substring(4);
+            if (clean.endsWith(".")) clean = clean.substring(0, clean.length() - 1);
+            if (!clean.isBlank()) reason = clean;
+        }
+
+        Bukkit.broadcastMessage("§c☠ " + player.getName() + " died! §7(" + reason + ")");
+        Bukkit.broadcastMessage("§6Lost " + money(coinsLost) + " coins §8• §cXP lost: " + xpPercent + "%");
+        Bukkit.broadcastMessage("§bUse /back §7or §abuy your last inventory in /shop §7(Death Inventory).");
+    }
+
+    private String money(double amount) {
+        return String.format(java.util.Locale.US, "%.2f", amount).replaceAll("\\.00$", "");
     }
 }
