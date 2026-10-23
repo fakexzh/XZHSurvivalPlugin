@@ -15,3 +15,18 @@ commands:
     usage: /customtime <set|info|on|off>
     aliases: [ct]
     permission: xzhsurvival.admin
+  tpa:
+    description: Preview and request a distance-priced teleport
+    usage: /tpa <player>
+  tpasend:
+    description: Confirm sending a prepared teleport request
+    usage: /tpasend
+  tpacancel:
+    description: Cancel a prepared teleport request
+    usage: /tpacancel
+  tpaccept:
+    description: Accept a pending teleport request
+    usage: /tpaccept
+  tpdeny:
+    description: Decline a pending teleport request
+    usage: /tpdeny
