@@ -36,6 +36,7 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
     private final Random random = new Random();
     private final Map<UUID, Integer> pendingXpRestore = new HashMap<>();
     private CustomTimeManager customTimeManager;
+    private TpaManager tpaManager;
 
     @Override
     public void onEnable() {
@@ -43,12 +44,15 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         getServer().getPluginManager().registerEvents(this, this);
         customTimeManager = new CustomTimeManager(this);
         customTimeManager.start();
+        tpaManager = new TpaManager(this);
+        tpaManager.start();
         getLogger().info("XZH Survival Plugin enabled.");
     }
 
     @Override
     public void onDisable() {
         if (customTimeManager != null) customTimeManager.shutdown();
+        if (tpaManager != null) tpaManager.shutdown();
     }
 
     @EventHandler(ignoreCancelled = true)
