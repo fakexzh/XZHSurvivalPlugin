@@ -33,33 +33,33 @@ jobs:
           import re
           from pathlib import Path
 
-          path = Path('src/main/resources/villager-dialogue.yml')
-          text = path.read_text(encoding='utf-8')
+          text = Path('src/main/resources/villager-dialogue.yml').read_text(encoding='utf-8')
 
           def normalize(value):
               value = value.casefold()
               value = re.sub(r'[^\w\s]', '', value, flags=re.UNICODE)
               return re.sub(r'\s+', ' ', value).strip()
 
-          story_section = text.split('\\nstories:', 1)[1]
-          story_blocks = re.split(r'^  - id: story-\\d+\\s*$', story_section, flags=re.M)[1:]
+          story_section = text.split('\nstories:', 1)[1]
+          story_blocks = re.split(r'^  - id: story-\d+\s*$', story_section, flags=re.M)[1:]
           sequences = []
           for block in story_blocks:
-              lines = [json.loads(line) for line in re.findall(r'^      - ("(?:\\\\.|[^"\\\\])*")\\s*$', block, re.M)]
-              if not lines:
-                  raise AssertionError('Found a story entry without dialogue lines')
+              quoted_lines = re.findall(r'^      - ("(?:\\.|[^"\\])*")\s*$', block, re.M)
+              lines = [json.loads(line) for line in quoted_lines]
+              if len(lines) < 6:
+                  raise AssertionError(f'Story has fewer than six lines: {len(lines)}')
               sequences.append(tuple(normalize(line) for line in lines))
 
           unique_sequences = set(sequences)
-          ambient_section = text.split('ambient-lines:', 1)[1].split('\\nplayer-offers:', 1)[0]
-          ambient = [json.loads(line) for line in re.findall(r'^  - ("(?:\\\\.|[^"\\\\])*")\\s*$', ambient_section, re.M)]
+          ambient_section = text.split('ambient-lines:', 1)[1].split('\nplayer-offers:', 1)[0]
+          quoted_ambient = re.findall(r'^  - ("(?:\\.|[^"\\])*")\s*$', ambient_section, re.M)
+          ambient = [json.loads(line) for line in quoted_ambient]
           unique_ambient = {normalize(line) for line in ambient}
 
           assert len(story_blocks) >= 500, f'Expected at least 500 story entries, got {len(story_blocks)}'
           assert len(unique_sequences) >= 500, f'Expected at least 500 unique story sequences, got {len(unique_sequences)}'
           assert len(ambient) >= 60, f'Expected at least 60 ambient lines, got {len(ambient)}'
           assert len(unique_ambient) == len(ambient), f'Duplicate ambient lines remain: {len(ambient) - len(unique_ambient)}'
-          assert all(len(lines) >= 6 for lines in sequences), 'Every story must have at least six dialogue lines'
           print(f'Validated {len(story_blocks)} stories, {len(unique_sequences)} unique sequences, and {len(ambient)} unique ambient lines')
           PY
       - name: Upload JAR
