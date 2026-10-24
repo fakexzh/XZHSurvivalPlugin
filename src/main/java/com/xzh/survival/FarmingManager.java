@@ -141,8 +141,10 @@ public final class FarmingManager implements Listener {
 
         Material ground = target.getRelative(BlockFace.DOWN).getType();
         return switch (crop) {
-            case WHEAT, CARROTS, POTATOES, BEETROOTS -> ground == Material.FARMLAND;
+            case WHEAT, CARROTS, POTATOES, BEETROOTS,
+                    TORCHFLOWER_CROP, PITCHER_CROP -> ground == Material.FARMLAND;
             case NETHER_WART -> ground == Material.SOUL_SAND;
+            case SWEET_BERRY_BUSH -> isBerrySoil(ground);
             default -> false;
         };
     }
@@ -153,9 +155,18 @@ public final class FarmingManager implements Listener {
                 || material == Material.STRIPPED_JUNGLE_WOOD;
     }
 
+    private boolean isBerrySoil(Material material) {
+        return switch (material) {
+            case GRASS_BLOCK, DIRT, COARSE_DIRT, PODZOL, MYCELIUM,
+                    ROOTED_DIRT, MOSS_BLOCK -> true;
+            default -> false;
+        };
+    }
+
     private boolean isSupportedCrop(Material material) {
         return switch (material) {
-            case WHEAT, CARROTS, POTATOES, BEETROOTS, NETHER_WART, COCOA -> true;
+            case WHEAT, CARROTS, POTATOES, BEETROOTS, NETHER_WART, COCOA,
+                    SWEET_BERRY_BUSH, TORCHFLOWER_CROP, PITCHER_CROP -> true;
             default -> false;
         };
     }
@@ -168,6 +179,9 @@ public final class FarmingManager implements Listener {
             case BEETROOTS -> Material.BEETROOT_SEEDS;
             case NETHER_WART -> Material.NETHER_WART;
             case COCOA -> Material.COCOA_BEANS;
+            case SWEET_BERRY_BUSH -> Material.SWEET_BERRIES;
+            case TORCHFLOWER_CROP -> Material.TORCHFLOWER_SEEDS;
+            case PITCHER_CROP -> Material.PITCHER_POD;
             default -> null;
         };
     }
