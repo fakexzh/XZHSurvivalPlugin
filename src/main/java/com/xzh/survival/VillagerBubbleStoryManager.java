@@ -193,6 +193,7 @@ public final class VillagerBubbleStoryManager implements Listener {
         }
         StorySession session = new StorySession(speakers, lines, story);
         for (Villager speaker : speakers) activeByVillager.put(speaker.getUniqueId(), session);
+        session.beginConversation();
         session.showLine();
     }
 
@@ -204,12 +205,54 @@ public final class VillagerBubbleStoryManager implements Listener {
         private TextDisplay currentDisplay;
         private BukkitTask followTask;
         private BukkitTask sequenceTask;
+        private BukkitTask conversationTask;
+        private final Map<UUID, Boolean> originalAi = new HashMap<>();
+        private long conversationStartedAt;
         private boolean stopped;
 
         private StorySession(List<Villager> speakers, List<String> lines, boolean story) {
             this.speakers = new ArrayList<>(speakers);
             this.lines = new ArrayList<>(lines);
             this.story = story;
+            for (Villager speaker : speakers) originalAi.put(speaker.getUniqueId(), speaker.hasAI());
+        }
+
+        private void beginConversation() {
+            if (speakers.size() != 2) return;
+            conversationStartedAt = System.currentTimeMillis();
+            conversationTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+                if (stopped) return;
+                Villager first = speakers.get(0);
+                Villager second = speakers.get(1);
+                if (!first.isValid() || first.isDead() || !second.isValid() || second.isDead()) {
+                    stop();
+                    return;
+                }
+                double distanceSquared = first.getLocation().distanceSquared(second.getLocation());
+                boolean arrived = distanceSquared <= 2.8 * 2.8;
+                boolean timedOut = System.currentTimeMillis() - conversationStartedAt >= 8000L;
+                if (!arrived && !timedOut) {
+                    first.getPathfinder().moveTo(second.getLocation(), 0.85);
+                    second.getPathfinder().moveTo(first.getLocation(), 0.85);
+                } else {
+                    for (Villager villager : speakers) {
+                        villager.getPathfinder().stopPathfinding();
+                        villager.setVelocity(new Vector(0, 0, 0));
+                        villager.setAI(false);
+                    }
+                }
+                faceAt(first, second.getLocation());
+                faceAt(second, first.getLocation());
+            }, 1L, 2L);
+        }
+
+        private void faceAt(Villager villager, Location target) {
+            Location current = villager.getLocation();
+            double dx = target.getX() - current.getX();
+            double dz = target.getZ() - current.getZ();
+            if (dx * dx + dz * dz < 1.0e-6) return;
+            float yaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
+            villager.setRotation(yaw, 0.0f);
         }
 
         private void showLine() {
@@ -295,9 +338,18 @@ public final class VillagerBubbleStoryManager implements Listener {
             if (stopped) return;
             stopped = true;
             if (sequenceTask != null) sequenceTask.cancel();
+            if (conversationTask != null) {
+                conversationTask.cancel();
+                conversationTask = null;
+            }
             removeCurrentBubble();
             for (Villager speaker : speakers) {
                 activeByVillager.remove(speaker.getUniqueId(), this);
+                Boolean wasAiEnabled = originalAi.get(speaker.getUniqueId());
+                if (wasAiEnabled != null && speaker.isValid() && !speaker.isDead()) {
+                    speaker.getPathfinder().stopPathfinding();
+                    speaker.setAI(wasAiEnabled);
+                }
             }
         }
     }
