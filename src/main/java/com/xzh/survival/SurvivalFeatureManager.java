@@ -435,24 +435,6 @@ public final class SurvivalFeatureManager implements Listener {
             return;
         }
 
-        TextDisplay display = healthDisplays.get(player.getUniqueId());
-        if (display == null || !display.isValid()) {
-            display = player.getWorld().spawn(healthDisplayLocation(player), TextDisplay.class);
-            display.setBillboard(Display.Billboard.CENTER);
-            display.setSeeThrough(true);
-            display.setShadowed(false);
-            display.setDefaultBackground(false);
-            display.setBackgroundColor(Color.fromARGB(0, 0, 0, 0));
-            display.setAlignment(TextDisplay.TextAlignment.CENTER);
-            display.setLineWidth(100);
-            display.setViewRange(1.5f);
-            display.setPersistent(false);
-            healthDisplays.put(player.getUniqueId(), display);
-            hideDisplayFromEveryoneExcept(player, display);
-        } else if (!target.getUniqueId().equals(healthTargets.get(player.getUniqueId()))) {
-            hideDisplayFromEveryoneExcept(player, display);
-        }
-
         int current = Math.max(0, (int) Math.ceil(target.getHealth()));
         AttributeInstance maxHealthAttribute = target.getAttribute(Attribute.MAX_HEALTH);
         double maxHealth = maxHealthAttribute == null ? target.getHealth() : maxHealthAttribute.getValue();
@@ -462,31 +444,10 @@ public final class SurvivalFeatureManager implements Listener {
             targetName = target.getType().name().toLowerCase(Locale.ROOT).replace('_', ' ');
             targetName = Character.toUpperCase(targetName.charAt(0)) + targetName.substring(1);
         }
-        display.setText("§f" + targetName + " §8: §c" + current + "/" + maximum + " §fhealth!");
-        display.teleport(healthDisplayLocation(player));
+        String healthText = "§f" + targetName + " §8» §c" + current + "§7/§c" + maximum + " §c❤";
+        player.spigot().sendMessage(net.md_5.bungee.api.ChatMessageType.ACTION_BAR,
+                net.md_5.bungee.api.chat.TextComponent.fromLegacyText(healthText));
         healthTargets.put(player.getUniqueId(), target.getUniqueId());
-    }
-
-    /**
-     * Keep the target-health text in the viewer's camera space, just above the
-     * action-bar clock. It is deliberately not attached to the mob's head.
-     */
-    private Location healthDisplayLocation(Player viewer) {
-        Location eye = viewer.getEyeLocation();
-        org.bukkit.util.Vector forward = eye.getDirection().normalize();
-        org.bukkit.util.Vector worldUp = new org.bukkit.util.Vector(0, 1, 0);
-        org.bukkit.util.Vector right = forward.clone().crossProduct(worldUp).normalize();
-        if (right.lengthSquared() < 1.0e-6) right = new org.bukkit.util.Vector(1, 0, 0);
-        org.bukkit.util.Vector cameraUp = right.clone().crossProduct(forward).normalize();
-        return eye.add(forward.multiply(1.45)).add(cameraUp.multiply(-0.34));
-    }
-
-    private void hideDisplayFromEveryoneExcept(Player viewer, TextDisplay display) {
-        for (Player other : Bukkit.getOnlinePlayers()) {
-            if (!other.getUniqueId().equals(viewer.getUniqueId())) {
-                other.hideEntity(plugin, display);
-            }
-        }
     }
 
     private void hideOtherPlayersHealthDisplays(Player joiningPlayer) {
@@ -499,8 +460,13 @@ public final class SurvivalFeatureManager implements Listener {
 
     private void removeHealthDisplay(UUID playerId) {
         TextDisplay display = healthDisplays.remove(playerId);
-        healthTargets.remove(playerId);
+        UUID previousTarget = healthTargets.remove(playerId);
         if (display != null && display.isValid()) display.remove();
+        Player viewer = Bukkit.getPlayer(playerId);
+        if (previousTarget != null && viewer != null && viewer.isOnline()) {
+            viewer.spigot().sendMessage(net.md_5.bungee.api.ChatMessageType.ACTION_BAR,
+                    net.md_5.bungee.api.chat.TextComponent.fromLegacyText(""));
+        }
     }
 
     private void loadPlaytime() {
