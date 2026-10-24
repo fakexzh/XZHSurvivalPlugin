@@ -3,6 +3,7 @@ package com.xzh.survival;
 import org.bukkit.Bukkit;
 import org.bukkit.Color;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -126,22 +127,26 @@ public final class VillagerBubbleStoryManager implements Listener {
 
         for (World world : Bukkit.getWorlds()) {
             for (Villager villager : world.getEntitiesByClass(Villager.class)) {
-                if (!villager.isValid() || villager.isDead() || isBusy(villager.getUniqueId())) continue;
+                if (!villager.isValid() || villager.isDead() || villager.isSleeping()
+                        || isBusy(villager.getUniqueId()) || isConversationAreaBusy(villager, range)) continue;
                 if (now < villagerCooldownUntil.getOrDefault(villager.getUniqueId(), 0L)) continue;
                 if (random.nextDouble() >= chance) continue;
 
+                Player nearbyPlayer = nearestPlayer(villager, range);
+                boolean nearConversationBlock = hasConversationBlockNearby(villager);
+                if (nearbyPlayer == null && !nearConversationBlock) continue;
+
                 Villager partner = nearestVillager(villager, range);
-                if (partner != null && !isBusy(partner.getUniqueId())
+                if (partner != null && !partner.isSleeping() && !isConversationAreaBusy(partner, range)
                         && now >= villagerCooldownUntil.getOrDefault(partner.getUniqueId(), 0L)) {
                     if (!stories.isEmpty()) {
                         startSession(List.of(villager, partner), stories.get(random.nextInt(stories.size())), true);
-                    } else {
+                    } else if (!ambientLines.isEmpty()) {
                         startSession(List.of(villager, partner), List.of(randomLine(ambientLines)), true);
                     }
                     continue;
                 }
 
-                Player nearbyPlayer = nearestPlayer(villager, range);
                 if (nearbyPlayer != null) {
                     List<String> lines = random.nextDouble() < 0.65 ? playerOffers : ambientLines;
                     if (!lines.isEmpty()) startSession(List.of(villager), List.of(randomLine(lines)), false);
@@ -189,7 +194,9 @@ public final class VillagerBubbleStoryManager implements Listener {
     private void startSession(List<Villager> speakers, List<String> lines, boolean story) {
         if (speakers.isEmpty() || lines.isEmpty()) return;
         for (Villager speaker : speakers) {
-            if (!speaker.isValid() || speaker.isDead() || isBusy(speaker.getUniqueId())) return;
+            if (!speaker.isValid() || speaker.isDead() || speaker.isSleeping()
+                    || isBusy(speaker.getUniqueId()) || isConversationAreaBusy(speaker,
+                    Math.max(2.0, plugin.getConfig().getDouble("villager-bubble-chat.conversation-silence-range-blocks", 8.0)))) return;
         }
         StorySession session = new StorySession(speakers, lines, story);
         for (Villager speaker : speakers) activeByVillager.put(speaker.getUniqueId(), session);
@@ -356,6 +363,37 @@ public final class VillagerBubbleStoryManager implements Listener {
 
     private boolean isBusy(UUID villagerId) {
         return activeByVillager.containsKey(villagerId);
+    }
+
+    private boolean isConversationAreaBusy(Villager villager, double range) {
+        double radius = Math.max(2.0, plugin.getConfig().getDouble(
+                "villager-bubble-chat.conversation-silence-range-blocks", 8.0));
+        for (Entity nearby : villager.getNearbyEntities(radius, radius, radius)) {
+            if (nearby instanceof Villager other && other != villager
+                    && activeByVillager.containsKey(other.getUniqueId())) return true;
+        }
+        return false;
+    }
+
+    private boolean hasConversationBlockNearby(Villager villager) {
+        int radius = Math.max(1, plugin.getConfig().getInt("villager-bubble-chat.activity-block-radius", 3));
+        Location center = villager.getLocation();
+        for (int x = -radius; x <= radius; x++) {
+            for (int y = -1; y <= 1; y++) {
+                for (int z = -radius; z <= radius; z++) {
+                    Material type = center.getBlock().getRelative(x, y, z).getType();
+                    if (type == Material.COMPOSTER || type == Material.LECTERN
+                            || type == Material.CAMPFIRE || type == Material.BELL
+                            || type == Material.BREWING_STAND || type == Material.CAULDRON
+                            || type == Material.BARREL || type == Material.SMOKER
+                            || type == Material.BLAST_FURNACE || type == Material.FLETCHING_TABLE
+                            || type == Material.CARTOGRAPHY_TABLE || type == Material.LOOM
+                            || type == Material.STONECUTTER || type == Material.GRINDSTONE
+                            || type == Material.SMITHING_TABLE || type == Material.FARMLAND) return true;
+                }
+            }
+        }
+        return false;
     }
 
     private Villager nearestVillager(Entity origin, double range) {
