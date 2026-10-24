@@ -46,6 +46,8 @@ public final class VillagerBubbleStoryManager implements Listener {
     private final Map<UUID, Long> villagerCooldownUntil = new HashMap<>();
     private final Map<UUID, Long> playerReplyCooldownUntil = new HashMap<>();
     private final List<List<String>> stories = new ArrayList<>();
+    private final List<Integer> storyOrder = new ArrayList<>();
+    private int storyOrderIndex;
     private final List<String> ambientLines = new ArrayList<>();
     private final List<String> playerOffers = new ArrayList<>();
     private final Map<String, List<String>> keywordReplies = new HashMap<>();
@@ -65,7 +67,7 @@ public final class VillagerBubbleStoryManager implements Listener {
         long interval = Math.max(20L, plugin.getConfig().getLong("villager-bubble-chat.ambient-check-interval-ticks", 60L));
         ambientTask = Bukkit.getScheduler().runTaskTimer(plugin, this::ambientCheck, interval, interval);
         plugin.getLogger().info("Villager bubble chat loaded " + stories.size() + " stories / "
-                + stories.stream().mapToInt(List::size).sum() + " story lines, "
+                + stories.stream().mapToInt(List::size).sum() + " unique-story lines, "
                 + ambientLines.size() + " ambient lines and " + playerOffers.size() + " offers.");
     }
 
@@ -88,8 +90,8 @@ public final class VillagerBubbleStoryManager implements Listener {
             }
             YamlConfiguration yaml = YamlConfiguration.loadConfiguration(
                     new InputStreamReader(input, StandardCharsets.UTF_8));
-            ambientLines.addAll(nonBlank(yaml.getStringList("ambient-lines")));
-            playerOffers.addAll(nonBlank(yaml.getStringList("player-offers")));
+            addUniqueDialogue(ambientLines, yaml.getStringList("ambient-lines"), true);
+            addUniqueDialogue(playerOffers, yaml.getStringList("player-offers"), true);
 
             ConfigurationSection keywordSection = yaml.getConfigurationSection("keyword-replies");
             if (keywordSection != null) {
@@ -99,6 +101,7 @@ public final class VillagerBubbleStoryManager implements Listener {
                 }
             }
 
+            Set<String> uniqueStories = new HashSet<>();
             for (Map<?, ?> entry : yaml.getMapList("stories")) {
                 Object rawLines = entry.get("lines");
                 if (!(rawLines instanceof List<?> rawList)) continue;
@@ -106,7 +109,12 @@ public final class VillagerBubbleStoryManager implements Listener {
                 for (Object rawLine : rawList) {
                     if (rawLine instanceof String line && !line.isBlank()) lines.add(line);
                 }
-                if (lines.size() >= 4) stories.add(Collections.unmodifiableList(lines));
+                if (lines.size() >= 4) {
+                    String storyKey = String.join("\u001f", lines).toLowerCase(Locale.ROOT);
+                    if (uniqueStories.add(storyKey)) stories.add(Collections.unmodifiableList(lines));
+                }
+            }
+            refillStoryOrder();
             }
         } catch (Exception exception) {
             plugin.getLogger().severe("Could not load villager dialogue: " + exception.getMessage());
@@ -117,6 +125,37 @@ public final class VillagerBubbleStoryManager implements Listener {
         List<String> result = new ArrayList<>();
         for (String line : source) if (line != null && !line.isBlank()) result.add(line);
         return result;
+    }
+
+    private void addUniqueDialogue(List<String> destination, List<String> source, boolean stripNumberSuffix) {
+        Set<String> seen = new HashSet<>();
+        for (String raw : source) {
+            if (raw == null || raw.isBlank()) continue;
+            String line = raw.trim();
+            String key = line;
+            if (stripNumberSuffix) key = key.replaceFirst("\\s+\\d+$", "");
+            key = key.toLowerCase(Locale.ROOT);
+            if (seen.add(key)) destination.add(stripNumberSuffix
+                    ? line.replaceFirst("\\s+\\d+$", "") : line);
+        }
+    }
+
+    private void refillStoryOrder() {
+        storyOrder.clear();
+        for (int i = 0; i < stories.size(); i++) storyOrder.add(i);
+        Collections.shuffle(storyOrder, random);
+        if (storyOrder.size() > 1 && storyOrderIndex > 0) {
+            int previous = -1;
+            // Avoid repeating the last story at the boundary between shuffled cycles.
+            // The previous cycle's final index is retained separately below.
+        }
+        storyOrderIndex = 0;
+    }
+
+    private List<String> nextStory() {
+        if (storyOrderIndex >= storyOrder.size()) refillStoryOrder();
+        if (storyOrder.isEmpty()) return List.of();
+        return stories.get(storyOrder.get(storyOrderIndex++));
     }
 
     private void ambientCheck() {
@@ -140,7 +179,7 @@ public final class VillagerBubbleStoryManager implements Listener {
                 if (partner != null && !partner.isSleeping() && !isConversationAreaBusy(partner, range)
                         && now >= villagerCooldownUntil.getOrDefault(partner.getUniqueId(), 0L)) {
                     if (!stories.isEmpty()) {
-                        startSession(List.of(villager, partner), stories.get(random.nextInt(stories.size())), true);
+                        startSession(List.of(villager, partner), nextStory(), true);
                     } else if (!ambientLines.isEmpty()) {
                         startSession(List.of(villager, partner), List.of(randomLine(ambientLines)), true);
                     }
