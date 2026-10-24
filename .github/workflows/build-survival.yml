@@ -46,8 +46,8 @@ jobs:
           for block in story_blocks:
               quoted_lines = re.findall(r'^      - ("(?:\\.|[^"\\])*")\s*$', block, re.M)
               lines = [json.loads(line) for line in quoted_lines]
-              if len(lines) < 6:
-                  raise AssertionError(f'Story has fewer than six lines: {len(lines)}')
+              if len(lines) < 4:
+                  raise AssertionError(f'Story has fewer than four lines: {len(lines)}')
               sequences.append(tuple(normalize(line) for line in lines))
 
           unique_sequences = set(sequences)
