@@ -48,6 +48,7 @@ public final class VillagerBubbleStoryManager implements Listener {
     private final List<List<String>> stories = new ArrayList<>();
     private final List<Integer> storyOrder = new ArrayList<>();
     private int storyOrderIndex;
+    private int lastStoryIndex = -1;
     private final List<String> ambientLines = new ArrayList<>();
     private final List<String> playerOffers = new ArrayList<>();
     private final Map<String, List<String>> keywordReplies = new HashMap<>();
@@ -96,7 +97,8 @@ public final class VillagerBubbleStoryManager implements Listener {
             ConfigurationSection keywordSection = yaml.getConfigurationSection("keyword-replies");
             if (keywordSection != null) {
                 for (String key : keywordSection.getKeys(false)) {
-                    List<String> replies = nonBlank(keywordSection.getStringList(key));
+                    List<String> replies = new ArrayList<>();
+                    addUniqueDialogue(replies, keywordSection.getStringList(key), true);
                     if (!replies.isEmpty()) keywordReplies.put(normalize(key), replies);
                 }
             }
@@ -144,10 +146,9 @@ public final class VillagerBubbleStoryManager implements Listener {
         storyOrder.clear();
         for (int i = 0; i < stories.size(); i++) storyOrder.add(i);
         Collections.shuffle(storyOrder, random);
-        if (storyOrder.size() > 1 && storyOrderIndex > 0) {
-            int previous = -1;
-            // Avoid repeating the last story at the boundary between shuffled cycles.
-            // The previous cycle's final index is retained separately below.
+        if (storyOrder.size() > 1 && storyOrder.get(0) == lastStoryIndex) {
+            int swapIndex = 1 + random.nextInt(storyOrder.size() - 1);
+            Collections.swap(storyOrder, 0, swapIndex);
         }
         storyOrderIndex = 0;
     }
@@ -155,7 +156,8 @@ public final class VillagerBubbleStoryManager implements Listener {
     private List<String> nextStory() {
         if (storyOrderIndex >= storyOrder.size()) refillStoryOrder();
         if (storyOrder.isEmpty()) return List.of();
-        return stories.get(storyOrder.get(storyOrderIndex++));
+        lastStoryIndex = storyOrder.get(storyOrderIndex++);
+        return stories.get(lastStoryIndex);
     }
 
     private void ambientCheck() {
