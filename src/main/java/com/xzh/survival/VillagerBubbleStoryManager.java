@@ -117,7 +117,6 @@ public final class VillagerBubbleStoryManager implements Listener {
                 }
             }
             refillStoryOrder();
-            }
         } catch (Exception exception) {
             plugin.getLogger().severe("Could not load villager dialogue: " + exception.getMessage());
         }
