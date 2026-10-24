@@ -444,7 +444,7 @@ public final class SurvivalFeatureManager implements Listener {
             targetName = target.getType().name().toLowerCase(Locale.ROOT).replace('_', ' ');
             targetName = Character.toUpperCase(targetName.charAt(0)) + targetName.substring(1);
         }
-        String healthText = "§f" + targetName + " §8» §c" + current + "§7/§c" + maximum + " §c❤";
+        String healthText = "§f" + targetName + " §8» §f" + current + "§6/" + maximum + " §c❤";
         player.spigot().sendMessage(net.md_5.bungee.api.ChatMessageType.ACTION_BAR,
                 net.md_5.bungee.api.chat.TextComponent.fromLegacyText(healthText));
         healthTargets.put(player.getUniqueId(), target.getUniqueId());
