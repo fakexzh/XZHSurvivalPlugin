@@ -27,6 +27,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -52,6 +53,7 @@ public final class VillagerBubbleStoryManager implements Listener {
     private final List<String> ambientLines = new ArrayList<>();
     private final List<String> playerOffers = new ArrayList<>();
     private final Map<String, List<String>> keywordReplies = new HashMap<>();
+    private final Map<List<String>, String> lastRandomLineByList = new IdentityHashMap<>();
     private BukkitTask ambientTask;
 
     public VillagerBubbleStoryManager(JavaPlugin plugin) {
@@ -481,7 +483,26 @@ public final class VillagerBubbleStoryManager implements Listener {
     }
 
     private String randomLine(List<String> lines) {
-        return lines.get(random.nextInt(lines.size()));
+        if (lines.size() == 1) {
+            String only = lines.get(0);
+            lastRandomLineByList.put(lines, only);
+            return only;
+        }
+        String previous = lastRandomLineByList.get(lines);
+        String selected = lines.get(random.nextInt(lines.size()));
+        for (int attempt = 0; attempt < 8 && selected.equals(previous); attempt++) {
+            selected = lines.get(random.nextInt(lines.size()));
+        }
+        if (selected.equals(previous)) {
+            for (String candidate : lines) {
+                if (!candidate.equals(previous)) {
+                    selected = candidate;
+                    break;
+                }
+            }
+        }
+        lastRandomLineByList.put(lines, selected);
+        return selected;
     }
 
     private static String normalize(String value) {
