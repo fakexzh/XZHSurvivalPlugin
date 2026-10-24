@@ -112,3 +112,9 @@ roaming-bosses:
   spawn-chance-per-check: 0.035
   minimum-bank-reward: 50
   maximum-bank-reward: 500
+
+
+# Breaking a villager's workstation releases the nearest matching villager and clears its trades.
+villager-workstation-reset:
+  enabled: true
+  search-radius-blocks: 6.0
