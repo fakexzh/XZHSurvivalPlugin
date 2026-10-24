@@ -1,0 +1,47 @@
+name: Build XZH Survival Plugin
+on:
+  push:
+    branches:
+      - feature/banglish-villager-bubble-stories
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Java 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.1.0'
+      - name: Build plugin
+        run: gradle clean build --no-daemon
+      - name: Verify dialogue pack and JAR contents
+        run: |
+          test -f build/libs/XZHSurvivalPlugin-1.0.0.jar
+          jar tf build/libs/XZHSurvivalPlugin-1.0.0.jar | grep -q 'VillagerBubbleStoryManager.class'
+          jar tf build/libs/XZHSurvivalPlugin-1.0.0.jar | grep -q 'villager-dialogue.yml'
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+          text = Path('src/main/resources/villager-dialogue.yml').read_text(encoding='utf-8')
+          story_lines = len(re.findall(r'^      - ', text, re.M))
+          story_count = len(re.findall(r'^  - id: story-', text, re.M))
+          assert story_lines >= 2000, f'Expected 2000+ story dialogue lines, got {story_lines}'
+          assert story_count >= 200, f'Expected 200+ stories, got {story_count}'
+          print(f'Validated {story_count} stories and {story_lines} story lines')
+          PY
+      - name: Upload JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: XZHSurvivalPlugin-1.0.0
+          path: build/libs/XZHSurvivalPlugin-1.0.0.jar
+          if-no-files-found: error
+          retention-days: 90
