@@ -48,6 +48,7 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         saveDefaultConfig();
         migrateSurvivalConfig();
         getServer().getPluginManager().registerEvents(this, this);
+        getServer().getPluginManager().registerEvents(new VillagerWorkstationResetListener(this), this);
         // Restore vanilla daylight cycling if an older plugin version left it disabled.
         for (World world : Bukkit.getWorlds()) {
             world.setGameRule(org.bukkit.GameRule.DO_DAYLIGHT_CYCLE, true);
