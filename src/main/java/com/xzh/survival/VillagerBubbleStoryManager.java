@@ -1,0 +1,366 @@
+package com.xzh.survival;
+
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import org.bukkit.Bukkit;
+import org.bukkit.Color;
+import org.bukkit.Location;
+import org.bukkit.World;
+import org.bukkit.configuration.ConfigurationSection;
+import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.entity.Display;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.Player;
+import org.bukkit.entity.TextDisplay;
+import org.bukkit.entity.Villager;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.player.AsyncPlayerChatEvent;
+import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitTask;
+import org.bukkit.util.Vector;
+
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Random;
+import java.util.Set;
+import java.util.UUID;
+import java.util.regex.Pattern;
+
+/**
+ * Villager-only floating Banglish dialogue. TextDisplay entities are spawned
+ * above villagers and are never created for players or sent to server chat.
+ */
+public final class VillagerBubbleStoryManager implements Listener {
+    private final JavaPlugin plugin;
+    private final Random random = new Random();
+    private final Map<UUID, StorySession> activeByVillager = new HashMap<>();
+    private final Map<UUID, Long> villagerCooldownUntil = new HashMap<>();
+    private final Map<UUID, Long> playerReplyCooldownUntil = new HashMap<>();
+    private final List<List<String>> stories = new ArrayList<>();
+    private final List<String> ambientLines = new ArrayList<>();
+    private final List<String> playerOffers = new ArrayList<>();
+    private final Map<String, List<String>> keywordReplies = new HashMap<>();
+    private BukkitTask ambientTask;
+
+    public VillagerBubbleStoryManager(JavaPlugin plugin) {
+        this.plugin = plugin;
+        loadDialogue();
+    }
+
+    public void start() {
+        if (!plugin.getConfig().getBoolean("villager-bubble-chat.enabled", true)) {
+            plugin.getLogger().info("Villager bubble chat disabled by configuration.");
+            return;
+        }
+        Bukkit.getPluginManager().registerEvents(this, plugin);
+        long interval = Math.max(20L, plugin.getConfig().getLong("villager-bubble-chat.ambient-check-interval-ticks", 60L));
+        ambientTask = Bukkit.getScheduler().runTaskTimer(plugin, this::ambientCheck, interval, interval);
+        plugin.getLogger().info("Villager bubble chat loaded " + stories.size() + " stories / "
+                + stories.stream().mapToInt(List::size).sum() + " story lines, "
+                + ambientLines.size() + " ambient lines and " + playerOffers.size() + " offers.");
+    }
+
+    public void shutdown() {
+        if (ambientTask != null) ambientTask.cancel();
+        for (StorySession session : new HashSet<>(activeByVillager.values())) session.stop();
+        activeByVillager.clear();
+        for (World world : Bukkit.getWorlds()) {
+            for (TextDisplay display : world.getEntitiesByClass(TextDisplay.class)) {
+                if (display.getScoreboardTags().contains("xzh-villager-bubble")) display.remove();
+            }
+        }
+    }
+
+    private void loadDialogue() {
+        try (InputStream input = plugin.getResource("villager-dialogue.yml")) {
+            if (input == null) {
+                plugin.getLogger().severe("Missing villager-dialogue.yml; villager bubble chat will have no dialogue.");
+                return;
+            }
+            YamlConfiguration yaml = YamlConfiguration.loadConfiguration(
+                    new InputStreamReader(input, StandardCharsets.UTF_8));
+            ambientLines.addAll(nonBlank(yaml.getStringList("ambient-lines")));
+            playerOffers.addAll(nonBlank(yaml.getStringList("player-offers")));
+
+            ConfigurationSection keywordSection = yaml.getConfigurationSection("keyword-replies");
+            if (keywordSection != null) {
+                for (String key : keywordSection.getKeys(false)) {
+                    List<String> replies = nonBlank(keywordSection.getStringList(key));
+                    if (!replies.isEmpty()) keywordReplies.put(normalize(key), replies);
+                }
+            }
+
+            for (Map<?, ?> entry : yaml.getMapList("stories")) {
+                Object rawLines = entry.get("lines");
+                if (!(rawLines instanceof List<?> rawList)) continue;
+                List<String> lines = new ArrayList<>();
+                for (Object rawLine : rawList) {
+                    if (rawLine instanceof String line && !line.isBlank()) lines.add(line);
+                }
+                if (lines.size() >= 4) stories.add(Collections.unmodifiableList(lines));
+            }
+        } catch (Exception exception) {
+            plugin.getLogger().severe("Could not load villager dialogue: " + exception.getMessage());
+        }
+    }
+
+    private List<String> nonBlank(List<String> source) {
+        List<String> result = new ArrayList<>();
+        for (String line : source) if (line != null && !line.isBlank()) result.add(line);
+        return result;
+    }
+
+    private void ambientCheck() {
+        if (ambientLines.isEmpty() && stories.isEmpty() && playerOffers.isEmpty()) return;
+        long now = System.currentTimeMillis();
+        double range = Math.max(2.0, plugin.getConfig().getDouble("villager-bubble-chat.nearby-range-blocks", 6.0));
+        double chance = clamp(plugin.getConfig().getDouble("villager-bubble-chat.ambient-chance-per-check", 0.12), 0.0, 1.0);
+
+        for (World world : Bukkit.getWorlds()) {
+            for (Villager villager : world.getEntitiesByClass(Villager.class)) {
+                if (!villager.isValid() || villager.isDead() || isBusy(villager.getUniqueId())) continue;
+                if (now < villagerCooldownUntil.getOrDefault(villager.getUniqueId(), 0L)) continue;
+                if (random.nextDouble() >= chance) continue;
+
+                Villager partner = nearestVillager(villager, range);
+                if (partner != null && !isBusy(partner.getUniqueId())
+                        && now >= villagerCooldownUntil.getOrDefault(partner.getUniqueId(), 0L)) {
+                    if (!stories.isEmpty()) {
+                        startSession(List.of(villager, partner), stories.get(random.nextInt(stories.size())), true);
+                    } else {
+                        startSession(List.of(villager, partner), List.of(randomLine(ambientLines)), true);
+                    }
+                    continue;
+                }
+
+                Player nearbyPlayer = nearestPlayer(villager, range);
+                if (nearbyPlayer != null) {
+                    List<String> lines = random.nextDouble() < 0.65 ? playerOffers : ambientLines;
+                    if (!lines.isEmpty()) startSession(List.of(villager), List.of(randomLine(lines)), false);
+                }
+            }
+        }
+    }
+
+    @EventHandler
+    public void onPlayerChat(AsyncPlayerChatEvent event) {
+        // Preserve the player's normal chat untouched. Only inspect the message and
+        // schedule a possible response bubble above a nearby villager on the main thread.
+        final Player player = event.getPlayer();
+        final String message = event.getMessage();
+        Bukkit.getScheduler().runTask(plugin, () -> respondToPlayer(player, message));
+    }
+
+    private void respondToPlayer(Player player, String message) {
+        if (!plugin.getConfig().getBoolean("villager-bubble-chat.player-keyword-replies-enabled", true)
+                || !player.isOnline()) return;
+        long now = System.currentTimeMillis();
+        if (now < playerReplyCooldownUntil.getOrDefault(player.getUniqueId(), 0L)) return;
+        if (random.nextDouble() > clamp(plugin.getConfig().getDouble(
+                "villager-bubble-chat.keyword-response-chance", 0.80), 0.0, 1.0)) return;
+
+        String normalizedMessage = " " + normalize(message) + " ";
+        List<String> matches = new ArrayList<>();
+        for (String keyword : keywordReplies.keySet()) {
+            if (!keyword.isBlank() && normalizedMessage.contains(" " + keyword + " ")) matches.add(keyword);
+        }
+        if (matches.isEmpty()) return;
+        matches.sort(Comparator.comparingInt(String::length).reversed());
+        List<String> replies = keywordReplies.get(matches.get(0));
+        if (replies == null || replies.isEmpty()) return;
+
+        double range = Math.max(2.0, plugin.getConfig().getDouble("villager-bubble-chat.player-response-range-blocks", 7.0));
+        Villager villager = nearestVillager(player, range);
+        if (villager == null || isBusy(villager.getUniqueId())) return;
+
+        startSession(List.of(villager), List.of(randomLine(replies)), false);
+        long cooldown = Math.max(1L, plugin.getConfig().getLong("villager-bubble-chat.player-reply-cooldown-seconds", 12L));
+        playerReplyCooldownUntil.put(player.getUniqueId(), now + cooldown * 1000L);
+    }
+
+    private void startSession(List<Villager> speakers, List<String> lines, boolean story) {
+        if (speakers.isEmpty() || lines.isEmpty()) return;
+        for (Villager speaker : speakers) {
+            if (!speaker.isValid() || speaker.isDead() || isBusy(speaker.getUniqueId())) return;
+        }
+        StorySession session = new StorySession(speakers, lines, story);
+        for (Villager speaker : speakers) activeByVillager.put(speaker.getUniqueId(), session);
+        session.showLine();
+    }
+
+    private final class StorySession {
+        private final List<Villager> speakers;
+        private final List<String> lines;
+        private final boolean story;
+        private int index;
+        private TextDisplay currentDisplay;
+        private BukkitTask followTask;
+        private BukkitTask sequenceTask;
+        private boolean stopped;
+
+        private StorySession(List<Villager> speakers, List<String> lines, boolean story) {
+            this.speakers = new ArrayList<>(speakers);
+            this.lines = new ArrayList<>(lines);
+            this.story = story;
+        }
+
+        private void showLine() {
+            if (stopped) return;
+            if (index >= lines.size()) {
+                finish();
+                return;
+            }
+            for (Villager speaker : speakers) {
+                if (!speaker.isValid() || speaker.isDead()) {
+                    stop();
+                    return;
+                }
+            }
+
+            Villager speaker = speakers.get(index % speakers.size());
+            String line = lines.get(index);
+            currentDisplay = speaker.getWorld().spawn(
+                    speaker.getLocation().add(0.0, speaker.getHeight() + 0.38, 0.0),
+                    TextDisplay.class, display -> {
+                        display.addScoreboardTag("xzh-villager-bubble");
+                        display.setText(Component.text(line, NamedTextColor.WHITE));
+                        display.setBillboard(Display.Billboard.CENTER);
+                        display.setAlignment(TextDisplay.TextAlignment.CENTER);
+                        display.setLineWidth(Math.max(100, plugin.getConfig().getInt(
+                                "villager-bubble-chat.bubble-line-width", 240)));
+                        display.setBackgroundColor(Color.fromARGB(185, 18, 18, 18));
+                        display.setDefaultBackground(false);
+                        display.setSeeThrough(true);
+                        display.setShadowed(true);
+                        display.setGravity(false);
+                        display.setInvulnerable(true);
+                    });
+
+            followTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+                if (stopped || currentDisplay == null || !currentDisplay.isValid()
+                        || !speaker.isValid() || speaker.isDead()) {
+                    if (followTask != null) followTask.cancel();
+                    return;
+                }
+                Location target = speaker.getLocation().add(0.0, speaker.getHeight() + 0.38, 0.0);
+                currentDisplay.teleport(target);
+            }, 1L, 1L);
+
+            long duration = readingTicks(line);
+            sequenceTask = Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                removeCurrentBubble();
+                index++;
+                long gap = Math.max(2L, plugin.getConfig().getLong("villager-bubble-chat.line-gap-ticks", 8L));
+                sequenceTask = Bukkit.getScheduler().runTaskLater(plugin, this::showLine, gap);
+            }, duration);
+        }
+
+        private long readingTicks(String line) {
+            double minimum = Math.max(1.0, plugin.getConfig().getDouble("villager-bubble-chat.minimum-display-seconds", 2.4));
+            double perCharacter = Math.max(0.0, plugin.getConfig().getDouble("villager-bubble-chat.seconds-per-character", 0.055));
+            double maximum = Math.max(minimum, plugin.getConfig().getDouble("villager-bubble-chat.maximum-display-seconds", 7.0));
+            double seconds = Math.min(maximum, Math.max(minimum, minimum + line.length() * perCharacter));
+            return Math.max(20L, Math.round(seconds * 20.0));
+        }
+
+        private void removeCurrentBubble() {
+            if (followTask != null) {
+                followTask.cancel();
+                followTask = null;
+            }
+            if (currentDisplay != null) {
+                currentDisplay.remove();
+                currentDisplay = null;
+            }
+        }
+
+        private void finish() {
+            stop();
+            long cooldown = Math.max(1L, plugin.getConfig().getLong(
+                    story ? "villager-bubble-chat.story-cooldown-seconds" : "villager-bubble-chat.line-cooldown-seconds",
+                    story ? 24L : 5L));
+            long until = System.currentTimeMillis() + cooldown * 1000L;
+            for (Villager speaker : speakers) villagerCooldownUntil.put(speaker.getUniqueId(), until);
+        }
+
+        private void stop() {
+            if (stopped) return;
+            stopped = true;
+            if (sequenceTask != null) sequenceTask.cancel();
+            removeCurrentBubble();
+            for (Villager speaker : speakers) {
+                activeByVillager.remove(speaker.getUniqueId(), this);
+            }
+        }
+    }
+
+    private boolean isBusy(UUID villagerId) {
+        return activeByVillager.containsKey(villagerId);
+    }
+
+    private Villager nearestVillager(Entity origin, double range) {
+        Villager nearest = null;
+        double best = range * range;
+        for (Entity entity : origin.getNearbyEntities(range, range, range)) {
+            if (!(entity instanceof Villager villager) || villager == origin || !villager.isValid()
+                    || villager.isDead() || isBusy(villager.getUniqueId())) continue;
+            double distance = origin.getLocation().distanceSquared(villager.getLocation());
+            if (distance <= best) {
+                best = distance;
+                nearest = villager;
+            }
+        }
+        return nearest;
+    }
+
+    private Villager nearestVillager(Player player, double range) {
+        Villager nearest = null;
+        double best = range * range;
+        for (Entity entity : player.getNearbyEntities(range, range, range)) {
+            if (!(entity instanceof Villager villager) || !villager.isValid()
+                    || villager.isDead() || isBusy(villager.getUniqueId())) continue;
+            double distance = player.getLocation().distanceSquared(villager.getLocation());
+            if (distance <= best) {
+                best = distance;
+                nearest = villager;
+            }
+        }
+        return nearest;
+    }
+
+    private Player nearestPlayer(Villager villager, double range) {
+        Player nearest = null;
+        double best = range * range;
+        for (Entity entity : villager.getNearbyEntities(range, range, range)) {
+            if (!(entity instanceof Player player) || !player.isOnline()) continue;
+            double distance = villager.getLocation().distanceSquared(player.getLocation());
+            if (distance <= best) {
+                best = distance;
+                nearest = player;
+            }
+        }
+        return nearest;
+    }
+
+    private String randomLine(List<String> lines) {
+        return lines.get(random.nextInt(lines.size()));
+    }
+
+    private static String normalize(String value) {
+        return value.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", " ").trim().replaceAll("\\s+", " ");
+    }
+
+    private static double clamp(double value, double min, double max) {
+        return Math.max(min, Math.min(max, value));
+    }
+}
