@@ -1,7 +1,5 @@
 package com.xzh.survival;
 
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.Color;
 import org.bukkit.Location;
@@ -233,7 +231,7 @@ public final class VillagerBubbleStoryManager implements Listener {
                     speaker.getLocation().add(0.0, speaker.getHeight() + 0.38, 0.0),
                     TextDisplay.class, display -> {
                         display.addScoreboardTag("xzh-villager-bubble");
-                        display.setText(Component.text(line, NamedTextColor.WHITE));
+                        display.setText(line);
                         display.setBillboard(Display.Billboard.CENTER);
                         display.setAlignment(TextDisplay.TextAlignment.CENTER);
                         display.setLineWidth(Math.max(100, plugin.getConfig().getInt(
