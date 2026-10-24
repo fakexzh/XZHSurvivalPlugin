@@ -29,6 +29,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
@@ -50,6 +51,7 @@ public final class VillagerBubbleStoryManager implements Listener {
     private final List<Integer> storyOrder = new ArrayList<>();
     private int storyOrderIndex;
     private int lastStoryIndex = -1;
+    private final Map<UUID, LinkedHashSet<Integer>> recentStoriesByVillager = new HashMap<>();
     private final List<String> ambientLines = new ArrayList<>();
     private final List<String> playerOffers = new ArrayList<>();
     private final Map<String, List<String>> keywordReplies = new HashMap<>();
@@ -154,11 +156,35 @@ public final class VillagerBubbleStoryManager implements Listener {
         storyOrderIndex = 0;
     }
 
-    private List<String> nextStory() {
-        if (storyOrderIndex >= storyOrder.size()) refillStoryOrder();
+    private List<String> nextStory(List<Villager> participants) {
         if (storyOrder.isEmpty()) return List.of();
-        lastStoryIndex = storyOrder.get(storyOrderIndex++);
-        return stories.get(lastStoryIndex);
+        int checked = 0;
+        while (checked < storyOrder.size()) {
+            if (storyOrderIndex >= storyOrder.size()) refillStoryOrder();
+            int candidate = storyOrder.get(storyOrderIndex++);
+            checked++;
+            boolean recentlySeen = false;
+            for (Villager participant : participants) {
+                LinkedHashSet<Integer> recent = recentStoriesByVillager.get(participant.getUniqueId());
+                if (recent != null && recent.contains(candidate)) {
+                    recentlySeen = true;
+                    break;
+                }
+            }
+            if (recentlySeen) continue;
+
+            lastStoryIndex = candidate;
+            for (Villager participant : participants) {
+                LinkedHashSet<Integer> recent = recentStoriesByVillager.computeIfAbsent(
+                        participant.getUniqueId(), ignored -> new LinkedHashSet<>());
+                recent.add(candidate);
+                while (recent.size() > 40) {
+                    recent.remove(recent.iterator().next());
+                }
+            }
+            return stories.get(candidate);
+        }
+        return List.of();
     }
 
     private void ambientCheck() {
@@ -182,7 +208,9 @@ public final class VillagerBubbleStoryManager implements Listener {
                 if (partner != null && !partner.isSleeping() && !isConversationAreaBusy(partner, range)
                         && now >= villagerCooldownUntil.getOrDefault(partner.getUniqueId(), 0L)) {
                     if (!stories.isEmpty()) {
-                        startSession(List.of(villager, partner), nextStory(), true);
+                        List<Villager> speakers = List.of(villager, partner);
+                        List<String> story = nextStory(speakers);
+                        if (!story.isEmpty()) startSession(speakers, story, true);
                     } else if (!ambientLines.isEmpty()) {
                         startSession(List.of(villager, partner), List.of(randomLine(ambientLines)), true);
                     }
