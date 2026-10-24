@@ -437,7 +437,7 @@ public final class SurvivalFeatureManager implements Listener {
 
         TextDisplay display = healthDisplays.get(player.getUniqueId());
         if (display == null || !display.isValid()) {
-            display = target.getWorld().spawn(healthDisplayLocation(target), TextDisplay.class);
+            display = player.getWorld().spawn(healthDisplayLocation(player), TextDisplay.class);
             display.setBillboard(Display.Billboard.CENTER);
             display.setSeeThrough(true);
             display.setShadowed(false);
@@ -445,7 +445,7 @@ public final class SurvivalFeatureManager implements Listener {
             display.setBackgroundColor(Color.fromARGB(0, 0, 0, 0));
             display.setAlignment(TextDisplay.TextAlignment.CENTER);
             display.setLineWidth(100);
-            display.setViewRange(0.8f);
+            display.setViewRange(1.5f);
             display.setPersistent(false);
             healthDisplays.put(player.getUniqueId(), display);
             hideDisplayFromEveryoneExcept(player, display);
@@ -457,13 +457,28 @@ public final class SurvivalFeatureManager implements Listener {
         AttributeInstance maxHealthAttribute = target.getAttribute(Attribute.MAX_HEALTH);
         double maxHealth = maxHealthAttribute == null ? target.getHealth() : maxHealthAttribute.getValue();
         int maximum = Math.max(1, (int) Math.ceil(maxHealth));
-        display.setText("§f" + current + "/" + maximum);
-        display.teleport(healthDisplayLocation(target));
+        String targetName = target.getCustomName();
+        if (targetName == null || targetName.isBlank()) {
+            targetName = target.getType().name().toLowerCase(Locale.ROOT).replace('_', ' ');
+            targetName = Character.toUpperCase(targetName.charAt(0)) + targetName.substring(1);
+        }
+        display.setText("§f" + targetName + " §8: §c" + current + "/" + maximum + " §fhealth!");
+        display.teleport(healthDisplayLocation(player));
         healthTargets.put(player.getUniqueId(), target.getUniqueId());
     }
 
-    private Location healthDisplayLocation(LivingEntity target) {
-        return target.getLocation().add(0.0, target.getHeight() + 0.35, 0.0);
+    /**
+     * Keep the target-health text in the viewer's camera space, just above the
+     * action-bar clock. It is deliberately not attached to the mob's head.
+     */
+    private Location healthDisplayLocation(Player viewer) {
+        Location eye = viewer.getEyeLocation();
+        org.bukkit.util.Vector forward = eye.getDirection().normalize();
+        org.bukkit.util.Vector worldUp = new org.bukkit.util.Vector(0, 1, 0);
+        org.bukkit.util.Vector right = forward.clone().crossProduct(worldUp).normalize();
+        if (right.lengthSquared() < 1.0e-6) right = new org.bukkit.util.Vector(1, 0, 0);
+        org.bukkit.util.Vector cameraUp = right.clone().crossProduct(forward).normalize();
+        return eye.add(forward.multiply(1.45)).add(cameraUp.multiply(-0.34));
     }
 
     private void hideDisplayFromEveryoneExcept(Player viewer, TextDisplay display) {
