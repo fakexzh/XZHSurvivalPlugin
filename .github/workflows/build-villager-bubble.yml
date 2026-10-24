@@ -35,27 +35,20 @@ jobs:
           python3 - <<'PY'
           import re
           from pathlib import Path
+
           text = Path('src/main/resources/villager-dialogue.yml').read_text(encoding='utf-8')
           story_lines = len(re.findall(r'^      - ', text, re.M))
           story_count = len(re.findall(r'^  - id: story-', text, re.M))
           ambient_section = text.split('player-offers:', 1)[0]
           ambient_count = len(re.findall(r'^  - ', ambient_section, re.M))
           keyword_section = text.split('keyword-replies:', 1)[1].split('\nstories:', 1)[0]
-          keyword_count = len(re.findall(r'^  ".*":
-          PY
-      - name: Upload JAR
-        uses: actions/upload-artifact@v4
-        with:
-          name: XZHSurvivalPlugin-1.0.0
-          path: build/libs/XZHSurvivalPlugin-1.0.0.jar
-          if-no-files-found: error
-          retention-days: 90
-, keyword_section, re.M))
+          keyword_count = len(re.findall(r'^  ".*":', keyword_section, re.M))
+
           assert story_lines >= 6000, f'Expected 6000+ story dialogue lines, got {story_lines}'
-          assert story_count >= 1000, f'Expected 1000+ stories, got {story_count}'
-          assert ambient_count >= 500, f'Expected 500+ standalone ambient lines, got {ambient_count}'
+          assert story_count >= 1000, f'Expected 1000+ story entries, got {story_count}'
+          assert ambient_count >= 500, f'Expected 500+ raw ambient lines, got {ambient_count}'
           assert keyword_count >= 2000, f'Expected 2000+ keyword mappings, got {keyword_count}'
-          print(f'Validated {story_count} stories / {story_lines} story lines / {ambient_count} ambient lines / {keyword_count} keyword mappings')
+          print(f'Validated {story_count} story entries / {story_lines} raw story lines / {ambient_count} raw ambient lines / {keyword_count} keyword mappings')
           PY
       - name: Upload JAR
         uses: actions/upload-artifact@v4
