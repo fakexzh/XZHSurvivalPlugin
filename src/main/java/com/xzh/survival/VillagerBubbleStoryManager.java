@@ -40,6 +40,7 @@ import java.util.regex.Pattern;
 /**
  * Villager-only floating Banglish dialogue. TextDisplay entities are spawned
  * above villagers and are never created for players or sent to server chat.
+ * Ambient chatter and reply frequency are capped to stay occasional even with older configs.
  */
 public final class VillagerBubbleStoryManager implements Listener {
     private final JavaPlugin plugin;
