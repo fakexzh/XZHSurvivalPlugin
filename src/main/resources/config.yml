@@ -122,17 +122,17 @@ villager-workstation-reset:
 # Villager-only floating Banglish speech bubbles. No dialogue is sent to normal chat.
 villager-bubble-chat:
   enabled: true
-  ambient-check-interval-ticks: 60
-  ambient-chance-per-check: 0.12
+  ambient-check-interval-ticks: 200
+  ambient-chance-per-check: 0.025
   nearby-range-blocks: 6.0
   player-response-range-blocks: 7.0
   player-keyword-replies-enabled: true
-  keyword-response-chance: 0.80
-  player-reply-cooldown-seconds: 12
+  keyword-response-chance: 0.55
+  player-reply-cooldown-seconds: 25
   minimum-display-seconds: 2.4
   seconds-per-character: 0.055
   maximum-display-seconds: 7.0
   line-gap-ticks: 8
   bubble-line-width: 240
-  story-cooldown-seconds: 24
-  line-cooldown-seconds: 5
+  story-cooldown-seconds: 180
+  line-cooldown-seconds: 30
