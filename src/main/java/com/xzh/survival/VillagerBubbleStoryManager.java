@@ -69,7 +69,7 @@ public final class VillagerBubbleStoryManager implements Listener {
             return;
         }
         Bukkit.getPluginManager().registerEvents(this, plugin);
-        long interval = Math.max(20L, plugin.getConfig().getLong("villager-bubble-chat.ambient-check-interval-ticks", 60L));
+        long interval = Math.max(200L, plugin.getConfig().getLong("villager-bubble-chat.ambient-check-interval-ticks", 200L));
         ambientTask = Bukkit.getScheduler().runTaskTimer(plugin, this::ambientCheck, interval, interval);
         plugin.getLogger().info("Villager bubble chat loaded " + stories.size() + " stories / "
                 + stories.stream().mapToInt(List::size).sum() + " unique-story lines, "
@@ -191,7 +191,7 @@ public final class VillagerBubbleStoryManager implements Listener {
         if (ambientLines.isEmpty() && stories.isEmpty() && playerOffers.isEmpty()) return;
         long now = System.currentTimeMillis();
         double range = Math.max(2.0, plugin.getConfig().getDouble("villager-bubble-chat.nearby-range-blocks", 6.0));
-        double chance = clamp(plugin.getConfig().getDouble("villager-bubble-chat.ambient-chance-per-check", 0.12), 0.0, 1.0);
+        double chance = Math.min(0.03, clamp(plugin.getConfig().getDouble("villager-bubble-chat.ambient-chance-per-check", 0.025), 0.0, 1.0));
 
         for (World world : Bukkit.getWorlds()) {
             for (Villager villager : world.getEntitiesByClass(Villager.class)) {
@@ -239,8 +239,8 @@ public final class VillagerBubbleStoryManager implements Listener {
                 || !player.isOnline()) return;
         long now = System.currentTimeMillis();
         if (now < playerReplyCooldownUntil.getOrDefault(player.getUniqueId(), 0L)) return;
-        if (random.nextDouble() > clamp(plugin.getConfig().getDouble(
-                "villager-bubble-chat.keyword-response-chance", 0.80), 0.0, 1.0)) return;
+        if (random.nextDouble() > Math.min(0.55, clamp(plugin.getConfig().getDouble(
+                "villager-bubble-chat.keyword-response-chance", 0.55), 0.0, 1.0))) return;
 
         String normalizedMessage = " " + normalize(message) + " ";
         List<String> matches = new ArrayList<>();
@@ -257,7 +257,7 @@ public final class VillagerBubbleStoryManager implements Listener {
         if (villager == null || isBusy(villager.getUniqueId())) return;
 
         startSession(List.of(villager), List.of(randomLine(replies)), false);
-        long cooldown = Math.max(1L, plugin.getConfig().getLong("villager-bubble-chat.player-reply-cooldown-seconds", 12L));
+        long cooldown = Math.max(25L, plugin.getConfig().getLong("villager-bubble-chat.player-reply-cooldown-seconds", 25L));
         playerReplyCooldownUntil.put(player.getUniqueId(), now + cooldown * 1000L);
     }
 
@@ -404,9 +404,9 @@ public final class VillagerBubbleStoryManager implements Listener {
 
         private void finish() {
             stop();
-            long cooldown = Math.max(1L, plugin.getConfig().getLong(
+            long cooldown = Math.max(story ? 180L : 30L, plugin.getConfig().getLong(
                     story ? "villager-bubble-chat.story-cooldown-seconds" : "villager-bubble-chat.line-cooldown-seconds",
-                    story ? 24L : 5L));
+                    story ? 180L : 30L));
             long until = System.currentTimeMillis() + cooldown * 1000L;
             for (Villager speaker : speakers) villagerCooldownUntil.put(speaker.getUniqueId(), until);
         }
