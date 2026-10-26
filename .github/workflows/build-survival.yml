@@ -23,45 +23,18 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
       - name: Build plugin
         run: gradle --no-daemon clean build
-      - name: Verify dialogue uniqueness and JAR contents
+      - name: Verify villager dialogue was removed
         run: |
           test -f build/libs/XZHSurvivalPlugin-1.0.0.jar
-          jar tf build/libs/XZHSurvivalPlugin-1.0.0.jar | grep -q 'VillagerBubbleStoryManager.class'
-          jar tf build/libs/XZHSurvivalPlugin-1.0.0.jar | grep -q 'villager-dialogue.yml'
-          python3 - <<'PY'
-          import json
-          import re
-          from pathlib import Path
-
-          text = Path('src/main/resources/villager-dialogue.yml').read_text(encoding='utf-8')
-
-          def normalize(value):
-              value = value.casefold()
-              value = re.sub(r'[^\w\s]', '', value, flags=re.UNICODE)
-              return re.sub(r'\s+', ' ', value).strip()
-
-          story_section = text.split('\nstories:', 1)[1]
-          story_blocks = re.split(r'^  - id: story-\d+\s*$', story_section, flags=re.M)[1:]
-          sequences = []
-          for block in story_blocks:
-              quoted_lines = re.findall(r'^      - ("(?:\\.|[^"\\])*")\s*$', block, re.M)
-              lines = [json.loads(line) for line in quoted_lines]
-              if len(lines) < 4:
-                  raise AssertionError(f'Story has fewer than four lines: {len(lines)}')
-              sequences.append(tuple(normalize(line) for line in lines))
-
-          unique_sequences = set(sequences)
-          ambient_section = text.split('ambient-lines:', 1)[1].split('\nplayer-offers:', 1)[0]
-          quoted_ambient = re.findall(r'^  - ("(?:\\.|[^"\\])*")\s*$', ambient_section, re.M)
-          ambient = [json.loads(line) for line in quoted_ambient]
-          unique_ambient = {normalize(line) for line in ambient}
-
-          assert len(story_blocks) >= 500, f'Expected at least 500 story entries, got {len(story_blocks)}'
-          assert len(unique_sequences) >= 500, f'Expected at least 500 unique story sequences, got {len(unique_sequences)}'
-          assert len(ambient) >= 60, f'Expected at least 60 ambient lines, got {len(ambient)}'
-          assert len(unique_ambient) == len(ambient), f'Duplicate ambient lines remain: {len(ambient) - len(unique_ambient)}'
-          print(f'Validated {len(story_blocks)} stories, {len(unique_sequences)} unique sequences, and {len(ambient)} unique ambient lines')
-          PY
+          if jar tf build/libs/XZHSurvivalPlugin-1.0.0.jar | grep -Eq 'VillagerBubbleStoryManager.class|villager-dialogue.yml'; then
+            echo "Villager story dialogue still exists in the JAR"
+            exit 1
+          fi
+          if grep -R -n -E 'VillagerBubbleStoryManager|villager-bubble-chat|villager-dialogue.yml' src/main; then
+            echo "Villager story dialogue references remain in source"
+            exit 1
+          fi
+          echo "Verified: villager story/bubble dialogue removed"
       - name: Upload JAR
         uses: actions/upload-artifact@v4
         with:
