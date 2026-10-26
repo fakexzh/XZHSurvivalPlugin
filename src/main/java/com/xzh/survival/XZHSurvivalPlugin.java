@@ -42,7 +42,6 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
     private FarmingManager farmingManager;
     private BountyHuntManager bountyHuntManager;
     private RoamingBossManager roamingBossManager;
-    private CustomTimeManager customTimeManager;
 
     @Override
     public void onEnable() {
@@ -54,8 +53,6 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         for (World world : Bukkit.getWorlds()) {
             world.setGameRule(org.bukkit.GameRule.DO_DAYLIGHT_CYCLE, true);
         }
-        customTimeManager = new CustomTimeManager(this);
-        customTimeManager.start();
         survivalFeatureManager = new SurvivalFeatureManager(this);
         survivalFeatureManager.start();
         adventureLootManager = new AdventureLootManager(this);
@@ -74,14 +71,6 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
 
     private void migrateSurvivalConfig() {
         boolean changed = false;
-        // Initialize the custom clock only when a server config does not have settings yet.
-        // Existing custom-time values remain editable and are not overwritten on each boot.
-        if (!getConfig().contains("custom-time")) {
-            getConfig().set("custom-time.enabled", true);
-            getConfig().set("custom-time.day-duration-seconds", 2400);
-            getConfig().set("custom-time.night-duration-seconds", 1500);
-            changed = true;
-        }
         // Upgrade the plugin's former bundled bounty defaults without overriding custom server values.
         if (getConfig().getInt("bounty-hunt.rewards.common", -1) == 500) {
             getConfig().set("bounty-hunt.rewards.common", 200);
@@ -100,7 +89,6 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
 
     @Override
     public void onDisable() {
-        if (customTimeManager != null) customTimeManager.shutdown();
         if (survivalFeatureManager != null) survivalFeatureManager.shutdown();
         if (bountyHuntManager != null) bountyHuntManager.shutdown();
         if (roamingBossManager != null) roamingBossManager.shutdown();
