@@ -42,7 +42,6 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
     private FarmingManager farmingManager;
     private BountyHuntManager bountyHuntManager;
     private RoamingBossManager roamingBossManager;
-    private VillagerBubbleStoryManager villagerBubbleStoryManager;
 
     @Override
     public void onEnable() {
@@ -50,8 +49,6 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         migrateSurvivalConfig();
         getServer().getPluginManager().registerEvents(this, this);
         getServer().getPluginManager().registerEvents(new VillagerWorkstationResetListener(this), this);
-        villagerBubbleStoryManager = new VillagerBubbleStoryManager(this);
-        villagerBubbleStoryManager.start();
         // Restore vanilla daylight cycling if an older plugin version left it disabled.
         for (World world : Bukkit.getWorlds()) {
             world.setGameRule(org.bukkit.GameRule.DO_DAYLIGHT_CYCLE, true);
@@ -97,7 +94,6 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         if (survivalFeatureManager != null) survivalFeatureManager.shutdown();
         if (bountyHuntManager != null) bountyHuntManager.shutdown();
         if (roamingBossManager != null) roamingBossManager.shutdown();
-        if (villagerBubbleStoryManager != null) villagerBubbleStoryManager.shutdown();
     }
 
     @EventHandler(ignoreCancelled = true)
