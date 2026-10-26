@@ -1,9 +1,3 @@
-# Real-world day/night durations; sleeping can still skip night to morning.
-custom-time:
-  enabled: true
-  day-duration-seconds: 2400
-  night-duration-seconds: 1500
-
 # Replant mature crops from their harvest drops and award small vanilla XP orbs.
 farming:
   enabled: true
