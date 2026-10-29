@@ -413,7 +413,7 @@ public final class SurvivalFeatureManager implements Listener {
             return;
         }
         Location eye = player.getEyeLocation();
-        double range = Math.max(1.0, plugin.getConfig().getDouble("combat-indicators.target-range", 6.0));
+        double range = Math.max(1.0, plugin.getConfig().getDouble("combat-indicators.target-range", 32.0));
         double entityRange = range;
         RayTraceResult blockTrace = player.getWorld().rayTraceBlocks(eye, eye.getDirection(), range);
         if (blockTrace != null) {
@@ -444,7 +444,15 @@ public final class SurvivalFeatureManager implements Listener {
             targetName = target.getType().name().toLowerCase(Locale.ROOT).replace('_', ' ');
             targetName = Character.toUpperCase(targetName.charAt(0)) + targetName.substring(1);
         }
-        String healthText = "§f" + targetName + " §8» §f" + current + "§6/" + maximum + " §c❤";
+        String healthText;
+        if (target instanceof Monster monster) {
+            int level = Math.max(1, monster.getPersistentDataContainer()
+                    .getOrDefault(monsterLevelKey, PersistentDataType.INTEGER, 1));
+            healthText = "§f" + targetName + " §8- §f" + current + "/" + maximum
+                    + " §8(§dLv. " + level + "§8)";
+        } else {
+            healthText = "§f" + targetName + " §8» §f" + current + "§6/" + maximum + " §c❤";
+        }
         player.spigot().sendMessage(net.md_5.bungee.api.ChatMessageType.ACTION_BAR,
                 net.md_5.bungee.api.chat.TextComponent.fromLegacyText(healthText));
         healthTargets.put(player.getUniqueId(), target.getUniqueId());
