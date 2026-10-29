@@ -62,6 +62,7 @@ public final class SurvivalFeatureManager implements Listener {
     private final File playtimeFile;
     private final YamlConfiguration playtimeData = new YamlConfiguration();
     private BukkitTask ticker;
+    private BukkitTask healthTicker;
     private long elapsedSeconds;
 
     public SurvivalFeatureManager(JavaPlugin plugin) {
@@ -85,6 +86,8 @@ public final class SurvivalFeatureManager implements Listener {
             updateTab(player);
         }
         ticker = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, 20L, 20L);
+        long healthUpdateInterval = Math.max(1L, plugin.getConfig().getLong("combat-indicators.target-health-update-interval-ticks", 0L));
+        healthTicker = Bukkit.getScheduler().runTaskTimer(plugin, this::updateAllTargetHealth, 0L, healthUpdateInterval);
         Bukkit.getScheduler().runTaskTimer(plugin, this::tryMonsterBuilding, 60L, 60L);
     }
 
@@ -92,6 +95,10 @@ public final class SurvivalFeatureManager implements Listener {
         if (ticker != null) {
             ticker.cancel();
             ticker = null;
+        }
+        if (healthTicker != null) {
+            healthTicker.cancel();
+            healthTicker = null;
         }
         savePlaytime();
         for (TextDisplay display : healthDisplays.values()) {
@@ -174,7 +181,6 @@ public final class SurvivalFeatureManager implements Listener {
             syncLifetimePlaytime(player);
             announceLevelProgress(player);
             updateTab(player);
-            updateTargetHealth(player);
         }
         elapsedSeconds++;
         if (elapsedSeconds >= 60L) {
@@ -407,6 +413,12 @@ public final class SurvivalFeatureManager implements Listener {
         }
     }
 
+    private void updateAllTargetHealth() {
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            updateTargetHealth(player);
+        }
+    }
+
     private void updateTargetHealth(Player player) {
         if (!plugin.getConfig().getBoolean("combat-indicators.target-health-enabled", true)) {
             removeHealthDisplay(player.getUniqueId());
@@ -440,11 +452,18 @@ public final class SurvivalFeatureManager implements Listener {
         double maxHealth = maxHealthAttribute == null ? target.getHealth() : maxHealthAttribute.getValue();
         int maximum = Math.max(1, (int) Math.ceil(maxHealth));
         String targetName = target.getCustomName();
+        if (targetName != null && !targetName.isBlank()) {
+            String plainName = org.bukkit.ChatColor.stripColor(targetName);
+            targetName = plainName == null || plainName.isBlank() ? null : plainName;
+        }
         if (targetName == null || targetName.isBlank()) {
             targetName = target.getType().name().toLowerCase(Locale.ROOT).replace('_', ' ');
             targetName = Character.toUpperCase(targetName.charAt(0)) + targetName.substring(1);
         }
-        String healthText = "§f" + targetName + " §8» §f" + current + "§6/" + maximum + " §c❤";
+        int level = target instanceof Monster
+                ? target.getPersistentDataContainer().getOrDefault(monsterLevelKey, PersistentDataType.INTEGER, 1)
+                : 1;
+        String healthText = "§f" + targetName + " §f- §e" + current + "/" + maximum + " §f(§dLv. " + level + "§f)";
         player.spigot().sendMessage(net.md_5.bungee.api.ChatMessageType.ACTION_BAR,
                 net.md_5.bungee.api.chat.TextComponent.fromLegacyText(healthText));
         healthTargets.put(player.getUniqueId(), target.getUniqueId());
