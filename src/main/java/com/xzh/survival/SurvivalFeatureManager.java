@@ -23,6 +23,8 @@ import org.bukkit.entity.Monster;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Projectile;
 import org.bukkit.entity.TextDisplay;
+import org.bukkit.entity.Villager;
+import org.bukkit.entity.Pose;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.event.EventHandler;
@@ -63,6 +65,7 @@ public final class SurvivalFeatureManager implements Listener {
     private final YamlConfiguration playtimeData = new YamlConfiguration();
     private BukkitTask ticker;
     private BukkitTask healthTicker;
+    private BukkitTask villagerHealTicker;
     private long elapsedSeconds;
 
     public SurvivalFeatureManager(JavaPlugin plugin) {
@@ -94,6 +97,7 @@ public final class SurvivalFeatureManager implements Listener {
         ticker = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, 20L, 20L);
         long healthUpdateInterval = Math.max(1L, plugin.getConfig().getLong("combat-indicators.target-health-update-interval-ticks", 0L));
         healthTicker = Bukkit.getScheduler().runTaskTimer(plugin, this::updateAllTargetHealth, 0L, healthUpdateInterval);
+        villagerHealTicker = Bukkit.getScheduler().runTaskTimer(plugin, this::healSleepingVillagers, 20L, 20L);
         Bukkit.getScheduler().runTaskTimer(plugin, this::tryMonsterBuilding, 60L, 60L);
     }
 
@@ -105,6 +109,10 @@ public final class SurvivalFeatureManager implements Listener {
         if (healthTicker != null) {
             healthTicker.cancel();
             healthTicker = null;
+        }
+        if (villagerHealTicker != null) {
+            villagerHealTicker.cancel();
+            villagerHealTicker = null;
         }
         savePlaytime();
         for (TextDisplay display : healthDisplays.values()) {
