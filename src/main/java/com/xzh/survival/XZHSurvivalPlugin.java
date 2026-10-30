@@ -14,6 +14,8 @@ import org.bukkit.util.Vector;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.inventory.ItemStack;
@@ -92,6 +94,26 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         if (survivalFeatureManager != null) survivalFeatureManager.shutdown();
         if (bountyHuntManager != null) bountyHuntManager.shutdown();
         if (roamingBossManager != null) roamingBossManager.shutdown();
+    }
+
+    private String placedLogPath(Block block) {
+        return "tree-felling.player-placed-logs." + block.getWorld().getUID() + "."
+                + block.getX() + "." + block.getY() + "." + block.getZ();
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onLogPlace(BlockPlaceEvent event) {
+        if (!Tag.LOGS.isTagged(event.getBlockPlaced().getType())) return;
+        getConfig().set(placedLogPath(event.getBlockPlaced()), true);
+        saveConfig();
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void clearPlacedLogMarker(BlockBreakEvent event) {
+        String path = placedLogPath(event.getBlock());
+        if (!getConfig().contains(path)) return;
+        getConfig().set(path, null);
+        saveConfig();
     }
 
     @EventHandler(ignoreCancelled = true)
@@ -184,7 +206,8 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         while (!queue.isEmpty() && found.size() < maximum) {
             Block current = queue.removeFirst();
             String key = current.getX() + ":" + current.getY() + ":" + current.getZ();
-            if (!seen.add(key) || !Tag.LOGS.isTagged(current.getType())) continue;
+            if (!seen.add(key) || !Tag.LOGS.isTagged(current.getType())
+                    || getConfig().getBoolean(placedLogPath(current), false)) continue;
             found.add(current);
             for (int x = -1; x <= 1; x++) {
                 for (int y = -1; y <= 1; y++) {
