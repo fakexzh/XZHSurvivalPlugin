@@ -101,7 +101,7 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
                 + block.getX() + "." + block.getY() + "." + block.getZ();
     }
 
-    @EventHandler(ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onLogPlace(BlockPlaceEvent event) {
         if (!Tag.LOGS.isTagged(event.getBlockPlaced().getType())) return;
         getConfig().set(placedLogPath(event.getBlockPlaced()), true);
