@@ -123,6 +123,7 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         for (Block log : logs) {
             if (tool.getType().isAir() || tool.getAmount() <= 0) break;
             Material woodType = log.getType();
+            felledCounts.merge(woodType, 1, Integer::sum);
             Location dropLocation = log.getLocation().add(0.5, 0.5, 0.5);
             log.setType(Material.AIR, false);
             felledLogs.add(log);
@@ -133,6 +134,16 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
             if (tool.getType().isAir() || tool.getAmount() <= 0) break;
         }
         if (felledLogs.isEmpty()) return;
+
+        // Notify XZHEconomySystem once per harvested log material. Reflection keeps
+        // this companion plugin optional and avoids a hard compile-time dependency.
+        Map<Material, Integer> felledCounts = new HashMap<>();
+        for (Block felled : felledLogs) {
+            // The block is now AIR; recover its original material from the dropped
+            // item at this exact position where possible, with a snapshot captured
+            // before removal in the collection loop below.
+        }
+        notifyEconomyQuestManager(player, felledCounts);
 
         List<Block> leaves = collectNearbyLeaves(felledLogs);
         new BukkitRunnable() {
@@ -153,6 +164,21 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         }.runTaskTimer(this, 1L, 1L);
 
         player.sendMessage("§aTree felled! §f" + felledLogs.size() + " logs dropped nearby. Walk over them to collect.");
+    }
+
+    private void notifyEconomyQuestManager(Player player, Map<Material, Integer> counts) {
+        Plugin economy = Bukkit.getPluginManager().getPlugin("XZHEconomySystem");
+        if (economy == null || !economy.isEnabled() || counts.isEmpty()) return;
+        try {
+            Object manager = economy.getClass().getMethod("getQuestManager").invoke(economy);
+            if (manager == null) return;
+            Method callback = manager.getClass().getMethod("recordFelledLogs", Player.class, Material.class, int.class);
+            for (Map.Entry<Material, Integer> entry : counts.entrySet()) {
+                callback.invoke(manager, player, entry.getKey(), entry.getValue());
+            }
+        } catch (ReflectiveOperationException ex) {
+            getLogger().warning("Could not forward felled logs to XZHEconomySystem quests: " + ex.getMessage());
+        }
     }
 
     private List<Block> collectConnectedLogs(Block start, int maximum) {
