@@ -96,12 +96,12 @@ public final class DeathChestManager implements Listener {
         org.bukkit.block.data.type.Chest firstData =
                 (org.bukkit.block.data.type.Chest) first.getBlockData();
         firstData.setFacing(org.bukkit.block.BlockFace.NORTH);
-        firstData.setType(Type.RIGHT);
+        firstData.setType(Type.LEFT);
         first.setBlockData(firstData, false);
         org.bukkit.block.data.type.Chest secondData =
                 (org.bukkit.block.data.type.Chest) second.getBlockData();
         secondData.setFacing(org.bukkit.block.BlockFace.NORTH);
-        secondData.setType(Type.LEFT);
+        secondData.setType(Type.RIGHT);
         second.setBlockData(secondData, false);
 
         BlockState state = first.getState();
