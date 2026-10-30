@@ -77,6 +77,12 @@ public final class SurvivalFeatureManager implements Listener {
         boolean configChanged = false;
         if (plugin.getConfig().getLong("mob-progression.hours-per-level", 1L) != 1L) { plugin.getConfig().set("mob-progression.hours-per-level", 1L); configChanged = true; }
         if (plugin.getConfig().getInt("mob-progression.maximum-level", 25) != 25) { plugin.getConfig().set("mob-progression.maximum-level", 25); configChanged = true; }
+        // Keep target health detection at the requested 32-block range even when an older
+        // config.yml already exists on the server and would otherwise retain its old value.
+        if (plugin.getConfig().getDouble("combat-indicators.target-range", 6.0) != 32.0) {
+            plugin.getConfig().set("combat-indicators.target-range", 32.0);
+            configChanged = true;
+        }
         if (configChanged) plugin.saveConfig();
         Bukkit.getPluginManager().registerEvents(this, plugin);
         for (Player player : Bukkit.getOnlinePlayers()) {
