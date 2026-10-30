@@ -122,6 +122,20 @@ public final class SurvivalFeatureManager implements Listener {
         healthTargets.clear();
     }
 
+    private void healSleepingVillagers() {
+        for (World world : Bukkit.getWorlds()) {
+            for (Villager villager : world.getEntitiesByClass(Villager.class)) {
+                if (villager.isDead() || villager.getPose() != Pose.SLEEPING) continue;
+                AttributeInstance maximum = villager.getAttribute(Attribute.MAX_HEALTH);
+                if (maximum == null) continue;
+                double maxHealth = maximum.getValue();
+                if (villager.getHealth() < maxHealth) {
+                    villager.setHealth(Math.min(maxHealth, villager.getHealth() + 1.0));
+                }
+            }
+        }
+    }
+
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
