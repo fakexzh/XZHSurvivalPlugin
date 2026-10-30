@@ -293,7 +293,32 @@ public final class DeathChestManager implements Listener {
         return null;
     }
 
-    @EventHandler\n    public void onChunkLoad(ChunkLoadEvent event) {\n        long now = System.currentTimeMillis();\n        for (Record record : new ArrayList<>(records.values())) {\n            if (record.expiresAt() > now || !record.worldId().equals(event.getWorld().getUID())) continue;\n            if ((record.x1() >> 4) == event.getChunk().getX() && (record.z1() >> 4) == event.getChunk().getZ()) removeChestHalf(event.getWorld(), record.x1(), record.y1(), record.z1(), record.id());\n            if ((record.x2() >> 4) == event.getChunk().getX() && (record.z2() >> 4) == event.getChunk().getZ()) removeChestHalf(event.getWorld(), record.x2(), record.y2(), record.z2(), record.id());\n            if (bothChunksLoaded(record)) { records.remove(record.id()); save(); }\n        }\n    }\n\n    private boolean bothChunksLoaded(Record r) {\n        World w = Bukkit.getWorld(r.worldId());\n        return w != null && w.isChunkLoaded(r.x1() >> 4, r.z1() >> 4) && w.isChunkLoaded(r.x2() >> 4, r.z2() >> 4);\n    }\n\n    private void expire() {
+    @EventHandler
+    public void onChunkLoad(ChunkLoadEvent event) {
+        long now = System.currentTimeMillis();
+        for (Record record : new ArrayList<>(records.values())) {
+            if (record.expiresAt() > now || !record.worldId().equals(event.getWorld().getUID())) continue;
+            if ((record.x1() >> 4) == event.getChunk().getX() && (record.z1() >> 4) == event.getChunk().getZ()) {
+                removeChestHalf(event.getWorld(), record.x1(), record.y1(), record.z1(), record.id());
+            }
+            if ((record.x2() >> 4) == event.getChunk().getX() && (record.z2() >> 4) == event.getChunk().getZ()) {
+                removeChestHalf(event.getWorld(), record.x2(), record.y2(), record.z2(), record.id());
+            }
+            if (bothChunksLoaded(record)) {
+                records.remove(record.id());
+                save();
+            }
+        }
+    }
+
+    private boolean bothChunksLoaded(Record record) {
+        World world = Bukkit.getWorld(record.worldId());
+        return world != null
+                && world.isChunkLoaded(record.x1() >> 4, record.z1() >> 4)
+                && world.isChunkLoaded(record.x2() >> 4, record.z2() >> 4);
+    }
+
+    private void expire() {
         long now = System.currentTimeMillis();
         Iterator<Record> iterator = records.values().iterator();
         List<UUID> expired = new ArrayList<>();
@@ -301,7 +326,7 @@ public final class DeathChestManager implements Listener {
             Record record = iterator.next();
             if (record.expiresAt() > now) continue;
             removeIfLoaded(record);
-            expired.add(record.id());
+            if (bothChunksLoaded(record)) expired.add(record.id());
         }
         if (!expired.isEmpty()) {
             expired.forEach(records::remove);
