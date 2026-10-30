@@ -15,6 +15,8 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.block.BlockPistonExtendEvent;
+import org.bukkit.event.block.BlockPistonRetractEvent;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.enchantments.Enchantment;
@@ -120,6 +122,26 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
                 saveConfig();
             }
         });
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onPistonMoveLogs(BlockPistonExtendEvent event) {
+        for (Block moved : event.getBlocks()) {
+            if (!Tag.LOGS.isTagged(moved.getType())) continue;
+            getConfig().set(placedLogPath(moved), true);
+            getConfig().set(placedLogPath(moved.getRelative(event.getDirection())), true);
+        }
+        saveConfig();
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onPistonRetractLogs(BlockPistonRetractEvent event) {
+        for (Block moved : event.getBlocks()) {
+            if (!Tag.LOGS.isTagged(moved.getType())) continue;
+            getConfig().set(placedLogPath(moved), true);
+            getConfig().set(placedLogPath(moved.getRelative(event.getDirection().getOppositeFace())), true);
+        }
+        saveConfig();
     }
 
     @EventHandler(ignoreCancelled = true)
