@@ -112,8 +112,14 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
     public void clearPlacedLogMarker(BlockBreakEvent event) {
         String path = placedLogPath(event.getBlock());
         if (!getConfig().contains(path)) return;
-        getConfig().set(path, null);
-        saveConfig();
+        Block block = event.getBlock();
+        Material originalType = block.getType();
+        Bukkit.getScheduler().runTask(this, () -> {
+            if (block.getType() != originalType) {
+                getConfig().set(path, null);
+                saveConfig();
+            }
+        });
     }
 
     @EventHandler(ignoreCancelled = true)
