@@ -120,6 +120,7 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         // Every harvested log costs one durability point (subject to normal Unbreaking).
         // If the axe breaks, logs beyond that point remain in the world and are not collected.
         List<Block> felledLogs = new ArrayList<>();
+        Map<Material, Integer> felledCounts = new HashMap<>();
         for (Block log : logs) {
             if (tool.getType().isAir() || tool.getAmount() <= 0) break;
             Material woodType = log.getType();
@@ -137,12 +138,6 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
 
         // Notify XZHEconomySystem once per harvested log material. Reflection keeps
         // this companion plugin optional and avoids a hard compile-time dependency.
-        Map<Material, Integer> felledCounts = new HashMap<>();
-        for (Block felled : felledLogs) {
-            // The block is now AIR; recover its original material from the dropped
-            // item at this exact position where possible, with a snapshot captured
-            // before removal in the collection loop below.
-        }
         notifyEconomyQuestManager(player, felledCounts);
 
         List<Block> leaves = collectNearbyLeaves(felledLogs);
