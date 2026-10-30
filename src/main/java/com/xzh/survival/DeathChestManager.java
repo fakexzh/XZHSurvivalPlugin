@@ -19,6 +19,7 @@ import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockExplodeEvent;
 import org.bukkit.event.block.BlockPistonExtendEvent;
 import org.bukkit.event.block.BlockPistonRetractEvent;
+import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.inventory.InventoryMoveItemEvent;
@@ -75,7 +76,7 @@ public final class DeathChestManager implements Listener {
         save();
     }
 
-    @EventHandler(priority = EventPriority.MONITOR)
+    @EventHandler(priority = EventPriority.HIGHEST)
     public void onDeath(PlayerDeathEvent event) {
         if (event.getKeepInventory() || event.getDrops().isEmpty()) return;
         Player player = event.getEntity();
@@ -95,12 +96,12 @@ public final class DeathChestManager implements Listener {
         org.bukkit.block.data.type.Chest firstData =
                 (org.bukkit.block.data.type.Chest) first.getBlockData();
         firstData.setFacing(org.bukkit.block.BlockFace.NORTH);
-        firstData.setType(Type.LEFT);
+        firstData.setType(Type.RIGHT);
         first.setBlockData(firstData, false);
         org.bukkit.block.data.type.Chest secondData =
                 (org.bukkit.block.data.type.Chest) second.getBlockData();
         secondData.setFacing(org.bukkit.block.BlockFace.NORTH);
-        secondData.setType(Type.RIGHT);
+        secondData.setType(Type.LEFT);
         second.setBlockData(secondData, false);
 
         BlockState state = first.getState();
@@ -292,7 +293,7 @@ public final class DeathChestManager implements Listener {
         return null;
     }
 
-    private void expire() {
+    @EventHandler\n    public void onChunkLoad(ChunkLoadEvent event) {\n        long now = System.currentTimeMillis();\n        for (Record record : new ArrayList<>(records.values())) {\n            if (record.expiresAt() > now || !record.worldId().equals(event.getWorld().getUID())) continue;\n            if ((record.x1() >> 4) == event.getChunk().getX() && (record.z1() >> 4) == event.getChunk().getZ()) removeChestHalf(event.getWorld(), record.x1(), record.y1(), record.z1(), record.id());\n            if ((record.x2() >> 4) == event.getChunk().getX() && (record.z2() >> 4) == event.getChunk().getZ()) removeChestHalf(event.getWorld(), record.x2(), record.y2(), record.z2(), record.id());\n            if (bothChunksLoaded(record)) { records.remove(record.id()); save(); }\n        }\n    }\n\n    private boolean bothChunksLoaded(Record r) {\n        World w = Bukkit.getWorld(r.worldId());\n        return w != null && w.isChunkLoaded(r.x1() >> 4, r.z1() >> 4) && w.isChunkLoaded(r.x2() >> 4, r.z2() >> 4);\n    }\n\n    private void expire() {
         long now = System.currentTimeMillis();
         Iterator<Record> iterator = records.values().iterator();
         List<UUID> expired = new ArrayList<>();
