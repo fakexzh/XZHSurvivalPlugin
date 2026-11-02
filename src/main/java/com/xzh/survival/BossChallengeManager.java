@@ -36,6 +36,7 @@ import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.vehicle.VehicleMoveEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
@@ -187,6 +188,10 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
         if (countdownTask != null) countdownTask.cancel();
         for (BossBar bar : bossBars.values()) bar.removeAll();
         bossBars.clear();
+        if (bossChunkTicket != null) {
+            bossChunkTicket.removePluginChunkTicket(plugin);
+            bossChunkTicket = null;
+        }
         savePersistentState();
     }
 
@@ -407,7 +412,7 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
             return;
         }
         Location challengerLocation = player.getLocation().clone();
-        Location bossLocation = findSpawnNear(challengerLocation, 16.0, 14.0, 18.0);
+        Location bossLocation = findSpawnNear(challengerLocation, 14.0, 18.0);
         if (bossLocation == null) {
             countdownPlayer = null;
             startCooldown(player.getUniqueId());
@@ -423,7 +428,7 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
         countdownPlayer = null;
     }
 
-    private Location findSpawnNear(Location base, double preferred, double min, double max) {
+    private Location findSpawnNear(Location base, double min, double max) {
         World world = base.getWorld();
         if (world == null) return null;
         for (int attempt = 0; attempt < 100; attempt++) {
@@ -793,6 +798,20 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
     }
 
     @EventHandler(ignoreCancelled = true)
+    public void onVehicleMove(VehicleMoveEvent event) {
+        if (arena == null || !arena.locked) return;
+        if (isInsideArena(event.getFrom()) != isInsideArena(event.getTo())) {
+            event.getVehicle().setVelocity(new Vector(0, 0, 0));
+            event.getVehicle().teleport(event.getFrom());
+            for (Entity passenger : event.getVehicle().getPassengers()) {
+                if (passenger instanceof Player player) {
+                    player.sendMessage("§cThe boss arena is sealed. Vehicles cannot cross its boundary.");
+                }
+            }
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
     public void onDamage(EntityDamageByEntityEvent event) {
         boolean bossVictim = event.getEntity() instanceof LivingEntity living && isBoss(living);
         boolean bossDamager = isBossDamager(event.getDamager());
@@ -860,6 +879,7 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
         activeBossId = null;
 
         Player killer = validFinalHitter(boss);
+        if (isLavaDeathLocation(boss.getLocation())) killer = null;
         String tier = tierOf(boss);
         String name = nameOf(boss);
         if (killer == null) {
@@ -887,6 +907,13 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
         Bukkit.broadcastMessage("§8§m------------------------------------------------");
         killer.sendMessage("§aYou delivered the final hit! The glowing Boss Key has dropped where the boss died.");
         finishEncounter("§aVICTORY!", "Defeated by " + killer.getName() + " • key dropped", Sound.UI_TOAST_CHALLENGE_COMPLETE);
+    }
+
+    private boolean isLavaDeathLocation(Location location) {
+        if (location == null || location.getWorld() == null) return false;
+        if (location.getBlock().getType() == Material.LAVA) return true;
+        if (location.clone().add(0.0, 1.0, 0.0).getBlock().getType() == Material.LAVA) return true;
+        return location.clone().subtract(0.0, 1.0, 0.0).getBlock().getType() == Material.LAVA;
     }
 
     private Player validFinalHitter(LivingEntity boss) {
