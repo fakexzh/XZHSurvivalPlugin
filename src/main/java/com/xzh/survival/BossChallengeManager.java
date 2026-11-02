@@ -31,6 +31,7 @@ import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.entity.EntityTargetLivingEntityEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
+import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
@@ -221,6 +222,11 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
     }
 
     private void restoreEncounter(LivingEntity boss) {
+        if (challengeAvailable) {
+            challengeAvailable = false;
+            Bukkit.broadcastMessage("§eAn existing boss encounter was restored; the pending global challenge has been postponed.");
+        }
+        countdownPlayer = null;
         activeBossId = boss.getUniqueId();
         PersistentDataContainer pdc = boss.getPersistentDataContainer();
         String tier = pdc.getOrDefault(tierTag, PersistentDataType.STRING, "common");
@@ -758,6 +764,18 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
                     && isInsideArena(player.getLocation())) return true;
         }
         return false;
+    }
+
+    @EventHandler
+    public void onChunkLoad(ChunkLoadEvent event) {
+        for (Entity entity : event.getChunk().getEntities()) {
+            if (!(entity instanceof LivingEntity living) || !isBoss(living)) continue;
+            if (activeBossId == null) {
+                restoreEncounter(living);
+            } else if (!activeBossId.equals(living.getUniqueId())) {
+                living.remove();
+            }
+        }
     }
 
     @EventHandler
