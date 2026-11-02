@@ -24,13 +24,11 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
     private AdventureLootManager adventureLootManager;
     private DynamicTradingManager dynamicTradingManager;
     private FarmingManager farmingManager;
-    private BountyHuntManager bountyHuntManager;
     private RoamingBossManager roamingBossManager;
 
     @Override
     public void onEnable() {
         saveDefaultConfig();
-        migrateSurvivalConfig();
         getServer().getPluginManager().registerEvents(this, this);
         getServer().getPluginManager().registerEvents(new VillagerWorkstationResetListener(this), this);
         // Restore vanilla daylight cycling if an older plugin version left it disabled.
@@ -45,36 +43,14 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         dynamicTradingManager.start();
         farmingManager = new FarmingManager(this);
         farmingManager.start();
-        bountyHuntManager = new BountyHuntManager(this);
-        bountyHuntManager.start();
         roamingBossManager = new RoamingBossManager(this);
         roamingBossManager.start();
-        if (getCommand("bounty") != null) getCommand("bounty").setExecutor(bountyHuntManager);
         getLogger().info("XZH Survival Plugin enabled.");
-    }
-
-    private void migrateSurvivalConfig() {
-        boolean changed = false;
-        // Upgrade the plugin's former bundled bounty defaults without overriding custom server values.
-        if (getConfig().getInt("bounty-hunt.rewards.common", -1) == 500) {
-            getConfig().set("bounty-hunt.rewards.common", 200);
-            changed = true;
-        }
-        if (getConfig().getInt("bounty-hunt.rewards.rare", -1) == 1300) {
-            getConfig().set("bounty-hunt.rewards.rare", 500);
-            changed = true;
-        }
-        if (getConfig().getInt("bounty-hunt.rewards.legendary", -1) == 3500) {
-            getConfig().set("bounty-hunt.rewards.legendary", 900);
-            changed = true;
-        }
-        if (changed) saveConfig();
     }
 
     @Override
     public void onDisable() {
         if (survivalFeatureManager != null) survivalFeatureManager.shutdown();
-        if (bountyHuntManager != null) bountyHuntManager.shutdown();
         if (roamingBossManager != null) roamingBossManager.shutdown();
     }
 
