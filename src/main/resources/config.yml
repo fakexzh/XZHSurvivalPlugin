@@ -89,6 +89,7 @@ combat-indicators:
 
 # Global boss challenges run on a fixed hourly schedule.
 # Entry fee: 100 bank coins. Spawn distance: 16 blocks.
+# Build verification follows the Paper API liquid-block check correction.
 # Rewards are written onto the glowing key: Common 350-500, Rare 500-1000, Legendary 1500-2500.
 
 
