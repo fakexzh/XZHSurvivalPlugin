@@ -4,6 +4,7 @@ import net.md_5.bungee.api.ChatMessageType;
 import net.md_5.bungee.api.chat.ClickEvent;
 import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.Bukkit;
+import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -62,11 +63,18 @@ public final class BossChallengeManager implements Listener {
 
     public void start() {
         nextChallengeAt = System.currentTimeMillis() + HOUR;
+        NamespacedKey legacyBossTag = new NamespacedKey(plugin, "roaming_boss");
         for (World world : Bukkit.getWorlds()) {
             for (Entity entity : world.getEntities()) {
+                if (entity instanceof LivingEntity living
+                        && living.getPersistentDataContainer().has(legacyBossTag, PersistentDataType.BYTE)) {
+                    living.remove();
+                    continue;
+                }
                 if (entity instanceof LivingEntity living && isBoss(living)) {
-                    activeBossId = living.getUniqueId();
-                    track(living);
+                    if (activeBossId == null) activeBossId = living.getUniqueId();
+                    else living.remove();
+                    if (living.isValid()) track(living);
                 }
             }
         }
@@ -297,10 +305,11 @@ public final class BossChallengeManager implements Listener {
     }
 
     private void updateBoss(LivingEntity boss) {
-        BossBar bar = bars.computeIfAbsent(boss.getUniqueId(), id -> {
+        BossBar bar = bars.get(boss.getUniqueId());
+        if (bar == null) {
             track(boss);
-            return bars.get(id);
-        });
+            bar = bars.get(boss.getUniqueId());
+        }
         double max = boss.getAttribute(Attribute.MAX_HEALTH) == null ? boss.getHealth() : boss.getAttribute(Attribute.MAX_HEALTH).getValue();
         bar.setProgress(Math.max(0.0, Math.min(1.0, boss.getHealth() / Math.max(1.0, max))));
         bar.setTitle(bossTitle(tier(boss)) + " §8• §c" + (int)Math.ceil(boss.getHealth()) + "§7/§c" + (int)max + " HP");
