@@ -87,9 +87,14 @@ combat-indicators:
   target-health-enabled: true
   target-range: 6.0
 
-# Global boss challenges run on a fixed hourly schedule.
-# Entry fee: 100 bank coins. Spawn distance: 16 blocks.
+# Global boss challenges run on a fixed hourly schedule with a 5-minute acceptance window.
+# Entry fee: 100 bank coins. Boss spawns approximately 16 blocks from the accepting player.
 # Rewards are written onto the glowing key: Common 350-500, Rare 500-1000, Legendary 1500-2500.
+# Boss names are randomly selected from fixed pools:
+# Common: Dreadfang, Grimjaw, Ashborn, Rotfang.
+# Rare: Nightveil, Bloodbane, Soulrender, Darkthorn.
+# Legendary: Oblivion, Doombringer, Netherborn, Ruin.
+# Arena: 16-block radius, 12-block height, 5-second entry window, then a locked boundary.
 
 
 # Breaking a villager's workstation releases the nearest matching villager and clears its trades.
