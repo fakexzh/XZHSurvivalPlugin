@@ -4,6 +4,7 @@ import net.md_5.bungee.api.ChatMessageType;
 import net.md_5.bungee.api.chat.ClickEvent;
 import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.Bukkit;
+import org.bukkit.Chunk;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -76,6 +77,7 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
     private final NamespacedKey keyAcceptedTag, keyDefeatedTag, keyEntryFeeTag;
 
     private final Map<UUID, BossBar> bossBars = new HashMap<>();
+    private Chunk bossChunkTicket;
     private final Map<UUID, Long> cooldowns = new HashMap<>();
     private final Set<String> redeemedKeyIds = new HashSet<>();
     private final Map<String, String> previousNameByTier = new HashMap<>();
@@ -242,6 +244,12 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
         ticks++;
         long now = System.currentTimeMillis();
 
+        if (arena != null && !arena.locked && now >= arena.lockAt) {
+            arena.locked = true;
+            emptySince = hasPlayersInsideArena() ? 0L : now;
+            Bukkit.broadcastMessage("§b§lBOSS ARENA LOCKED §8» §7Players inside are sealed in; players outside cannot enter.");
+        }
+
         if (activeBossId != null) {
             Entity entity = Bukkit.getEntity(activeBossId);
             if (!(entity instanceof LivingEntity boss) || boss.isDead() || !boss.isValid()) {
@@ -380,7 +388,7 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
             player.spigot().sendMessage(ChatMessageType.ACTION_BAR,
                     TextComponent.fromLegacyText("§6" + countdownName + " §7arrives in §e" + countdownSeconds + "s"));
             countdownSeconds--;
-        }, 20L, 20L);
+        }, 0L, 20L);
     }
 
     private void abortCountdown(UUID playerId, String playerName, String reason) {
@@ -584,6 +592,7 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
 
     private void trackBoss(LivingEntity boss) {
         removeBossBar(boss.getUniqueId());
+        updateBossChunkTicket(boss);
         String tier = tierOf(boss);
         BossBar bar = Bukkit.createBossBar(bossDisplay(nameOf(boss), tier),
                 tier.equals("legendary") ? BarColor.RED : tier.equals("rare") ? BarColor.PURPLE : BarColor.BLUE,
@@ -593,6 +602,7 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
     }
 
     private void updateBoss(LivingEntity boss) {
+        updateBossChunkTicket(boss);
         BossBar bar = bossBars.get(boss.getUniqueId());
         if (bar == null) {
             trackBoss(boss);
@@ -747,6 +757,13 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
 
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
+        Long cooldownUntil = cooldowns.get(event.getPlayer().getUniqueId());
+        if (cooldownUntil != null && cooldownUntil > System.currentTimeMillis()) {
+            Player player = event.getPlayer();
+            player.sendMessage("§eYour boss challenge cooldown has " + formatDuration(cooldownUntil - System.currentTimeMillis()) + " remaining.");
+            player.sendTitle("§eBOSS COOLDOWN", "§7" + formatDuration(cooldownUntil - System.currentTimeMillis()) + " remaining", 10, 60, 20);
+            player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 0.8f, 0.8f);
+        }
         if (challengerId != null && challengerId.equals(event.getPlayer().getUniqueId())) {
             emptySince = 0L;
             event.getPlayer().sendMessage("§eYour boss encounter is still active. Return to the arena if it has not ended.");
@@ -1051,9 +1068,25 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
         }
     }
 
+    private void updateBossChunkTicket(LivingEntity boss) {
+        Chunk current = boss.getChunk();
+        if (bossChunkTicket != null && !bossChunkTicket.equals(current)) {
+            bossChunkTicket.removePluginChunkTicket(plugin);
+            bossChunkTicket = null;
+        }
+        if (bossChunkTicket == null) {
+            current.addPluginChunkTicket(plugin);
+            bossChunkTicket = current;
+        }
+    }
+
     private void removeBossBar(UUID id) {
         BossBar bar = bossBars.remove(id);
         if (bar != null) bar.removeAll();
+        if (bossChunkTicket != null) {
+            bossChunkTicket.removePluginChunkTicket(plugin);
+            bossChunkTicket = null;
+        }
     }
 
     private boolean isBoss(Entity entity) {
