@@ -5,13 +5,6 @@ farming:
   xp-min: 1
   xp-max: 2
 
-tree-felling:
-  enabled: true
-  minimum-axe: WOODEN
-  minimum-leaves: 6
-  maximum-logs: 256
-  require-sneak-to-disable: true
-
 death:
   enabled: true
   xp-loss-min-percent: 25
