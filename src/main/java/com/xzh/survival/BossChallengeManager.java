@@ -384,8 +384,9 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
             player.sendMessage("§cA boss encounter is already in progress.");
             return;
         }
-        if (player.isDead() || player.getGameMode() == GameMode.SPECTATOR) {
-            player.sendMessage("§cYou cannot accept a challenge in your current state.");
+        if (player.isDead() || player.getGameMode() == GameMode.SPECTATOR
+                || player.getGameMode() == GameMode.CREATIVE) {
+            player.sendMessage("§cYou must be in Survival or Adventure mode to accept a challenge.");
             return;
         }
         long cooldownUntil = cooldowns.getOrDefault(player.getUniqueId(), 0L);
@@ -518,12 +519,24 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
         if (world == null) return false;
         int x = loc.getBlockX(), y = loc.getBlockY(), z = loc.getBlockZ();
         Material ground = world.getBlockAt(x, y - 1, z).getType();
-        if (!ground.isSolid() || ground.isLiquid()) return false;
+        Material feet = world.getBlockAt(x, y, z).getType();
+        Material head = world.getBlockAt(x, y + 1, z).getType();
+        if (!ground.isSolid() || ground.isLiquid() || isHazardous(ground)) return false;
         if (!world.getBlockAt(x, y, z).isPassable()
                 || !world.getBlockAt(x, y + 1, z).isPassable()) return false;
-        if (world.getBlockAt(x, y, z).isLiquid()
-                || world.getBlockAt(x, y + 1, z).isLiquid()) return false;
+        if (feet.isLiquid() || head.isLiquid() || isHazardous(feet) || isHazardous(head)) return false;
         return true;
+    }
+
+    private boolean isHazardous(Material material) {
+        return material == Material.MAGMA_BLOCK
+                || material == Material.CACTUS
+                || material == Material.CAMPFIRE
+                || material == Material.SOUL_CAMPFIRE
+                || material == Material.FIRE
+                || material == Material.SOUL_FIRE
+                || material == Material.SWEET_BERRY_BUSH
+                || material == Material.WITHER_ROSE;
     }
 
     private Location midpoint(Location a, Location b) {
@@ -807,6 +820,7 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
         if (arena == null) return false;
         for (Player player : arena.world.getPlayers()) {
             if (player.isOnline() && !player.isDead() && player.getGameMode() != GameMode.SPECTATOR
+                    && player.getGameMode() != GameMode.CREATIVE
                     && isInsideArena(player.getLocation())) return true;
         }
         return false;
@@ -903,7 +917,10 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
     @EventHandler(ignoreCancelled = true)
     public void onBossTarget(EntityTargetLivingEntityEvent event) {
         if (!(event.getEntity() instanceof LivingEntity source) || !isBoss(source)) return;
-        if (!(event.getTarget() instanceof Player target) || !isInsideArena(target.getLocation())) {
+        if (!(event.getTarget() instanceof Player target)
+                || target.getGameMode() == GameMode.SPECTATOR
+                || target.getGameMode() == GameMode.CREATIVE
+                || !isInsideArena(target.getLocation())) {
             event.setCancelled(true);
         }
     }
@@ -1210,6 +1227,7 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
         double bestDistance = range * range;
         for (Player player : boss.getWorld().getPlayers()) {
             if (player.isDead() || player.getGameMode() == GameMode.SPECTATOR
+                    || player.getGameMode() == GameMode.CREATIVE
                     || !isInsideArena(player.getLocation())) continue;
             double distance = player.getLocation().distanceSquared(boss.getLocation());
             if (distance < bestDistance) {
