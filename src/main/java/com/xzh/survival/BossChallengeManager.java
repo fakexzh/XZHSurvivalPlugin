@@ -521,10 +521,10 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
         Material ground = world.getBlockAt(x, y - 1, z).getType();
         Material feet = world.getBlockAt(x, y, z).getType();
         Material head = world.getBlockAt(x, y + 1, z).getType();
-        if (!ground.isSolid() || ground.isLiquid() || isHazardous(ground)) return false;
+        if (!ground.isSolid() || world.getBlockAt(x, y - 1, z).isLiquid() || isHazardous(ground)) return false;
         if (!world.getBlockAt(x, y, z).isPassable()
                 || !world.getBlockAt(x, y + 1, z).isPassable()) return false;
-        if (feet.isLiquid() || head.isLiquid() || isHazardous(feet) || isHazardous(head)) return false;
+        if (world.getBlockAt(x, y, z).isLiquid() || world.getBlockAt(x, y + 1, z).isLiquid() || isHazardous(feet) || isHazardous(head)) return false;
         return true;
     }
 
