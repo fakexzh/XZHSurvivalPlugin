@@ -163,6 +163,15 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
         loadPersistentState();
         nextChallengeAt = plugin.getConfig().getLong("boss-challenge.next-challenge-at",
                 System.currentTimeMillis() + HOUR_MS);
+        String savedWorldName = plugin.getConfig().getString("boss-challenge.active-boss-world");
+        if (savedWorldName != null) {
+            World savedWorld = Bukkit.getWorld(savedWorldName);
+            if (savedWorld != null) {
+                int chunkX = plugin.getConfig().getInt("boss-challenge.active-boss-chunk-x");
+                int chunkZ = plugin.getConfig().getInt("boss-challenge.active-boss-chunk-z");
+                savedWorld.getChunkAt(chunkX, chunkZ);
+            }
+        }
 
         NamespacedKey legacyBossTag = new NamespacedKey(plugin, "roaming_boss");
         for (World world : Bukkit.getWorlds()) {
@@ -173,11 +182,13 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
                     continue;
                 }
                 if (!isBoss(living)) continue;
-                if (activeBossId != null) {
+                if (activeBossId == null) {
+                    restoreEncounter(living);
+                } else if (!activeBossId.equals(living.getUniqueId())) {
                     living.remove();
-                    continue;
+                } else {
+                    trackBoss(living);
                 }
-                restoreEncounter(living);
             }
         }
 
@@ -218,6 +229,24 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
         }
         plugin.getConfig().set("boss-challenge.redeemed-key-ids", new ArrayList<>(redeemedKeyIds));
         plugin.getConfig().set("boss-challenge.next-challenge-at", nextChallengeAt);
+        if (activeBossId != null && arena != null) {
+            plugin.getConfig().set("boss-challenge.active-boss-id", activeBossId.toString());
+            plugin.getConfig().set("boss-challenge.active-boss-world", arena.world.getName());
+            Chunk chunk = bossChunkTicket;
+            if (chunk == null) {
+                Entity active = Bukkit.getEntity(activeBossId);
+                if (active != null) chunk = active.getChunk();
+            }
+            if (chunk != null) {
+                plugin.getConfig().set("boss-challenge.active-boss-chunk-x", chunk.getX());
+                plugin.getConfig().set("boss-challenge.active-boss-chunk-z", chunk.getZ());
+            }
+        } else {
+            plugin.getConfig().set("boss-challenge.active-boss-id", null);
+            plugin.getConfig().set("boss-challenge.active-boss-world", null);
+            plugin.getConfig().set("boss-challenge.active-boss-chunk-x", null);
+            plugin.getConfig().set("boss-challenge.active-boss-chunk-z", null);
+        }
         plugin.saveConfig();
     }
 
@@ -551,6 +580,7 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
         arena.lockAt = System.currentTimeMillis() + 5000L;
         emptySince = 0L;
         trackBoss(boss);
+        savePersistentState();
 
         if (manual) {
             Bukkit.broadcastMessage("§6§lADMIN BOSS SPAWN §8» §f" + bossDisplay(name, tier) + " §7was spawned by §e" + acceptedName + "§7.");
@@ -768,8 +798,14 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
 
     @EventHandler
     public void onChunkLoad(ChunkLoadEvent event) {
+        NamespacedKey legacyBossTag = new NamespacedKey(plugin, "roaming_boss");
         for (Entity entity : event.getChunk().getEntities()) {
-            if (!(entity instanceof LivingEntity living) || !isBoss(living)) continue;
+            if (!(entity instanceof LivingEntity living)) continue;
+            if (living.getPersistentDataContainer().has(legacyBossTag, PersistentDataType.BYTE)) {
+                living.remove();
+                continue;
+            }
+            if (!isBoss(living)) continue;
             if (activeBossId == null) {
                 restoreEncounter(living);
             } else if (!activeBossId.equals(living.getUniqueId())) {
@@ -1042,14 +1078,14 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
         Player player = completedChallenger == null ? null : Bukkit.getPlayer(completedChallenger);
         if (completedChallenger != null) {
             cooldowns.put(completedChallenger, System.currentTimeMillis() + COOLDOWN_MS);
-            savePersistentState();
         }
+        clearEncounterState();
+        savePersistentState();
         if (player != null && player.isOnline()) {
             String cooldownText = completedChallenger == null ? "" : " • 3-hour cooldown started";
             showPrivateResult(player, title, subtitle + cooldownText, sound);
             player.sendMessage("§eYour 3-hour boss challenge cooldown has started.");
         }
-        clearEncounterState();
     }
 
     private void showPrivateResult(Player player, String title, String subtitle, Sound sound) {
@@ -1122,6 +1158,11 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
         if (bossChunkTicket == null) {
             current.addPluginChunkTicket(plugin);
             bossChunkTicket = current;
+            if (activeBossId != null && arena != null) {
+                plugin.getConfig().set("boss-challenge.active-boss-chunk-x", current.getX());
+                plugin.getConfig().set("boss-challenge.active-boss-chunk-z", current.getZ());
+                plugin.saveConfig();
+            }
         }
     }
 
