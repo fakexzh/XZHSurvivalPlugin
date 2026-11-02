@@ -372,6 +372,16 @@ public final class BossChallengeManager implements Listener {
         }
     }
 
+    @EventHandler
+    public void onCountdownDeath(org.bukkit.event.entity.PlayerDeathEvent event) {
+        UUID id = event.getEntity().getUniqueId();
+        if (!Objects.equals(countdownPlayer, id)) return;
+        countdownPlayer = null;
+        refundEntry(id);
+        Bukkit.broadcastMessage("§d§lXZH BOSS CHALLENGE §8» §7" + event.getEntity().getName()
+                + " died before the boss arrived. The entry fee was refunded.");
+    }
+
     @EventHandler(ignoreCancelled = true)
     public void onDamage(EntityDamageByEntityEvent event) {
         boolean bossVictim = event.getEntity() instanceof LivingEntity le && isBoss(le);
