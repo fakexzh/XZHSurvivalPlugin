@@ -161,8 +161,13 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
 
     public void start() {
         loadPersistentState();
-        nextChallengeAt = plugin.getConfig().getLong("boss-challenge.next-challenge-at",
-                System.currentTimeMillis() + HOUR_MS);
+        if (plugin.getConfig().contains("boss-challenge.next-challenge-at")) {
+            nextChallengeAt = plugin.getConfig().getLong("boss-challenge.next-challenge-at");
+        } else {
+            nextChallengeAt = System.currentTimeMillis() + HOUR_MS;
+            plugin.getConfig().set("boss-challenge.next-challenge-at", nextChallengeAt);
+            plugin.saveConfig();
+        }
         String savedWorldName = plugin.getConfig().getString("boss-challenge.active-boss-world");
         if (savedWorldName != null) {
             World savedWorld = Bukkit.getWorld(savedWorldName);
@@ -255,7 +260,18 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
             challengeAvailable = false;
             Bukkit.broadcastMessage("§eAn existing boss encounter was restored; the pending global challenge has been postponed.");
         }
-        countdownPlayer = null;
+        if (countdownPlayer != null) {
+            UUID pending = countdownPlayer;
+            if (countdownTask != null) countdownTask.cancel();
+            countdownTask = null;
+            countdownPlayer = null;
+            startCooldown(pending);
+            Player pendingPlayer = Bukkit.getPlayer(pending);
+            if (pendingPlayer != null) {
+                showPrivateResult(pendingPlayer, "§cCHALLENGE CANCELLED", "An existing boss encounter was restored • 3-hour cooldown", Sound.ENTITY_VILLAGER_NO);
+            }
+            Bukkit.broadcastMessage("§cA pending boss challenge was cancelled because an existing encounter was restored. The entry fee was not refunded.");
+        }
         activeBossId = boss.getUniqueId();
         PersistentDataContainer pdc = boss.getPersistentDataContainer();
         String tier = pdc.getOrDefault(tierTag, PersistentDataType.STRING, "common");
@@ -982,7 +998,7 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
                                       String acceptedBy, String defeatedBy, int entryFee) {
         ItemStack key = new ItemStack(Material.TRIAL_KEY);
         ItemMeta meta = key.getItemMeta();
-        meta.setDisplayName("§6§l" + name + " Boss Key");
+        meta.setDisplayName("§6§l" + name + " §7(" + tierName(tier) + ") §6§lBoss Key");
         meta.setLore(List.of(
                 "§7Boss: §f" + name + " (" + tierName(tier) + ")",
                 "§7Reward: §6" + reward + " coins",
