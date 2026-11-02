@@ -4,3 +4,20 @@ main: com.xzh.survival.XZHSurvivalPlugin
 api-version: '26.3'
 softdepend: [XZHEconomySystem]
 description: Survival quality-of-life and dimension death rules for XZH servers
+
+commands:
+  boss:
+    description: Spawn a boss for an arena encounter
+    usage: /boss <bossname|common|rare|legendary>
+    permission: xzhsurvival.boss.admin
+  sorry:
+    description: Surrender your active boss challenge
+    usage: /sorry
+  xzhboss:
+    description: Accept or reject a global boss challenge
+    usage: /xzhboss <accept|reject>
+
+permissions:
+  xzhsurvival.boss.admin:
+    description: Allows manually spawning boss encounters
+    default: op
