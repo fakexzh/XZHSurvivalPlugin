@@ -1,4 +1,5 @@
 name: Build plugin
+# CI rebuild trigger after correcting Paper API liquid checks.
 
 on:
   push:
