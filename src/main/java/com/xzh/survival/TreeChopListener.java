@@ -29,7 +29,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 public final class TreeChopListener implements Listener {
-    private static final int MIN_LEAVES = 8;
+    private static final int MIN_LEAVES = 12;
     private static final int MAX_LOGS = 256;
     private static final int LEAF_SEARCH_RADIUS = 4;
 
@@ -81,7 +81,7 @@ public final class TreeChopListener implements Listener {
             for (ItemStack drop : drops) {
                 log.getWorld().dropItemNaturally(log.getLocation(), drop);
             }
-            // Enable physics so vanilla leaf-distance propagation and decay can occur.
+            // Keep normal block physics enabled; vanilla handles leaf-distance updates and random-tick decay.
             log.setType(Material.AIR, true);
             damageAxeTwice(player, axe);
             if (axe.getType().isAir()) break;
