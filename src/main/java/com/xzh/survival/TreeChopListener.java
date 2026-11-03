@@ -1,6 +1,5 @@
 package com.xzh.survival;
 
-import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.Tag;
 import org.bukkit.block.Block;
@@ -37,11 +36,12 @@ public final class TreeChopListener implements Listener {
         Block clicked = event.getClickedBlock();
         if (!Tag.LOGS.isTagged(clicked.getType())) return;
 
-        // Prevent the normal single-block break; this action is the sole tree-chop trigger.
-        event.setCancelled(true);
         ItemStack axe = player.getInventory().getItemInMainHand();
         Set<Block> logs = findConnectedLogs(clicked);
         if (logs.isEmpty() || countNearbyLeaves(logs) < MIN_LEAVES) return;
+
+        // Only a qualifying tree cancels the vanilla single-block interaction.
+        event.setCancelled(true);
 
         // Break only logs. Leaves are deliberately left completely untouched.
         for (Block log : logs) {
