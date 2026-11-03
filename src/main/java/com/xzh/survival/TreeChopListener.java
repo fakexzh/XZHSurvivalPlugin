@@ -50,7 +50,8 @@ public final class TreeChopListener implements Listener {
             for (ItemStack drop : drops) {
                 log.getWorld().dropItemNaturally(log.getLocation(), drop);
             }
-            log.setType(Material.AIR, false);
+            // Enable block physics so vanilla leaf-distance propagation starts and natural leaves decay.
+            log.setType(Material.AIR, true);
             damageAxeTwice(player, axe);
             if (axe.getType().isAir()) break;
         }
