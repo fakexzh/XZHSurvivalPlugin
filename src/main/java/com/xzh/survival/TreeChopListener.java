@@ -8,6 +8,13 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
+import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.configuration.file.YamlConfiguration;
+
+import java.io.File;
+import java.io.IOException;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.Damageable;
@@ -20,11 +27,34 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Queue;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 public final class TreeChopListener implements Listener {
     private static final int MIN_LEAVES = 5;
     private static final int MAX_LOGS = 256;
     private static final int LEAF_SEARCH_RADIUS = 4;
+    private final JavaPlugin plugin;
+    private final Set<String> playerPlacedLogs = new HashSet<>();
+    private final File placedLogsFile;
+    private final YamlConfiguration placedLogsData = new YamlConfiguration();
+
+    public TreeChopListener(JavaPlugin plugin) {
+        this.plugin = plugin;
+        this.placedLogsFile = new File(plugin.getDataFolder(), "player-placed-logs.yml");
+        loadPlacedLogs();
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onLogPlace(BlockPlaceEvent event) {
+        if (!Tag.LOGS.isTagged(event.getBlockPlaced().getType())) return;
+        playerPlacedLogs.add(key(event.getBlockPlaced()));
+        savePlacedLogs();
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onLogBreak(BlockBreakEvent event) {
+        if (playerPlacedLogs.remove(key(event.getBlock()))) savePlacedLogs();
+    }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onTreeChop(PlayerInteractEvent event) {
@@ -103,7 +133,7 @@ public final class TreeChopListener implements Listener {
         return leaves.size();
     }
 
-    private boolean isAxe(Material material) {
+    private String key(Block block) {\n        return block.getWorld().getUID() + ":" + block.getX() + ":" + block.getY() + ":" + block.getZ();\n    }\n\n    private void loadPlacedLogs() {\n        if (!placedLogsFile.exists()) return;\n        placedLogsData.loadConfiguration(placedLogsFile);\n        playerPlacedLogs.addAll(placedLogsData.getStringList("blocks"));\n    }\n\n    private void savePlacedLogs() {\n        placedLogsData.set("blocks", playerPlacedLogs.stream().sorted().collect(Collectors.toList()));\n        try {\n            if (!plugin.getDataFolder().exists()) plugin.getDataFolder().mkdirs();\n            placedLogsData.save(placedLogsFile);\n        } catch (IOException exception) {\n            plugin.getLogger().warning("Could not save player-placed log tracking: " + exception.getMessage());\n        }\n    }\n\n    private boolean isAxe(Material material) {
         return material.name().endsWith("_AXE");
     }
 
