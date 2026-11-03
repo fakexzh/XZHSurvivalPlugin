@@ -25,6 +25,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
+import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.entity.EntityChangeBlockEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
@@ -105,6 +106,13 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
     private Arena arena;
     private long emptySince;
     private long ticks;
+    private long combatTicks;
+    private long nextFlightTick;
+    private long flightEndsTick;
+    private long nextMeleeTick;
+    private long nextPillarTick;
+    private boolean flightMode;
+    private final Set<Location> temporaryArenaBlocks = new HashSet<>();
 
     private static final class Arena {
         private final World world;
@@ -198,6 +206,7 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
         }
 
         Bukkit.getScheduler().runTaskTimer(plugin, this::tick, 20L, 20L);
+        Bukkit.getScheduler().runTaskTimer(plugin, this::combatTick, 1L, 1L);
         Bukkit.getScheduler().runTaskTimer(plugin, this::drawArenaBoundary, 10L, 10L);
     }
 
@@ -209,6 +218,7 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
             bossChunkTicket.removePluginChunkTicket(plugin);
             bossChunkTicket = null;
         }
+        cleanupTemporaryArenaBlocks();
         savePersistentState();
     }
 
@@ -313,7 +323,6 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
                 activeBossId = null;
                 finishWithoutReward("The boss encounter ended unexpectedly.");
             } else {
-                updateBoss(boss);
                 if (arena != null && arena.locked) {
                     if (hasPlayersInsideArena()) {
                         emptySince = 0L;
@@ -559,8 +568,8 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
 
     private void spawnBoss(Location location, String tier, String name, UUID acceptedId,
                            String acceptedName, int fee, boolean manual, Arena newArena) {
-        EntityType[] types = {EntityType.ZOMBIE, EntityType.SKELETON, EntityType.HUSK, EntityType.STRAY};
-        Entity entity = location.getWorld().spawnEntity(location, types[random.nextInt(types.length)]);
+        // Vex supplies the visible wings and native flying model; movement and attack phases are controlled below.
+        Entity entity = location.getWorld().spawnEntity(location, EntityType.VEX);
         if (!(entity instanceof LivingEntity boss)) {
             entity.remove();
             if (acceptedId != null) {
@@ -582,7 +591,11 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
         boss.setCustomNameVisible(true);
         boss.setGlowing(true);
         boss.setRemoveWhenFarAway(false);
-        if (boss instanceof Mob mob) mob.setAware(true);
+        if (boss instanceof Mob mob) {
+            mob.setAware(false);
+            mob.setAI(false);
+        }
+        boss.setGravity(true);
 
         PersistentDataContainer pdc = boss.getPersistentDataContainer();
         pdc.set(bossTag, PersistentDataType.BYTE, (byte)1);
@@ -608,6 +621,12 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
         arena.locked = false;
         arena.lockAt = System.currentTimeMillis() + 5000L;
         emptySince = 0L;
+        flightMode = false;
+        combatTicks = 0L;
+        nextFlightTick = 100L + random.nextInt(61);
+        flightEndsTick = 0L;
+        nextMeleeTick = 0L;
+        nextPillarTick = 0L;
         trackBoss(boss);
         savePersistentState();
 
@@ -671,6 +690,14 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
         bossBars.put(boss.getUniqueId(), bar);
     }
 
+    private void combatTick() {
+        if (activeBossId == null) return;
+        Entity entity = Bukkit.getEntity(activeBossId);
+        if (!(entity instanceof LivingEntity boss) || !boss.isValid() || boss.isDead()) return;
+        combatTicks++;
+        updateBoss(boss);
+    }
+
     private void updateBoss(LivingEntity boss) {
         updateBossChunkTicket(boss);
         BossBar bar = bossBars.get(boss.getUniqueId());
@@ -678,46 +705,129 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
             trackBoss(boss);
             bar = bossBars.get(boss.getUniqueId());
         }
-        if (bar == null) return;
-        double max = boss.getAttribute(Attribute.MAX_HEALTH) == null
-                ? boss.getHealth() : boss.getAttribute(Attribute.MAX_HEALTH).getValue();
-        bar.setProgress(Math.max(0.0, Math.min(1.0, boss.getHealth() / Math.max(1.0, max))));
-        bar.setTitle(bossDisplay(nameOf(boss), tierOf(boss)) + " §8• §c"
-                + (int)Math.ceil(boss.getHealth()) + "§7/§c" + (int)max + " HP");
-
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            if (player.getWorld().equals(boss.getWorld())
-                    && player.getLocation().distanceSquared(boss.getLocation()) <= 48.0 * 48.0) {
-                if (!bar.getPlayers().contains(player)) bar.addPlayer(player);
-            } else {
-                bar.removePlayer(player);
+        if (bar != null && combatTicks % 10L == 0L) {
+            double max = boss.getAttribute(Attribute.MAX_HEALTH) == null
+                    ? boss.getHealth() : boss.getAttribute(Attribute.MAX_HEALTH).getValue();
+            bar.setProgress(Math.max(0.0, Math.min(1.0, boss.getHealth() / Math.max(1.0, max))));
+            bar.setTitle(bossDisplay(nameOf(boss), tierOf(boss)) + " §8• §c"
+                    + (int)Math.ceil(boss.getHealth()) + "§7/§c" + (int)max + " HP");
+            for (Player player : Bukkit.getOnlinePlayers()) {
+                if (player.getWorld().equals(boss.getWorld())
+                        && player.getLocation().distanceSquared(boss.getLocation()) <= 48.0 * 48.0) {
+                    if (!bar.getPlayers().contains(player)) bar.addPlayer(player);
+                } else {
+                    bar.removePlayer(player);
+                }
             }
         }
 
         Player target = findTargetInsideArena(boss, 40.0);
-        if (target == null) return;
-        if (ticks % 12L == 0L) flyBurst(boss, target);
-        long interval = tierOf(boss).equals("legendary") ? 6L : tierOf(boss).equals("rare") ? 8L : 10L;
-        if (ticks % interval == 0L) specialAttack(boss, target, tierOf(boss));
+        if (target == null) {
+            boss.setVelocity(new Vector(0, flightMode ? 0 : -0.04, 0));
+            return;
+        }
+
+        if (!flightMode && combatTicks >= nextFlightTick) {
+            flightMode = true;
+            flightEndsTick = combatTicks + 65L + random.nextInt(26);
+            boss.setGravity(false);
+            boss.getWorld().playSound(boss.getLocation(), Sound.ENTITY_VEX_CHARGE, 0.9f, 1.15f);
+            boss.getWorld().spawnParticle(org.bukkit.Particle.CLOUD, boss.getLocation(), 12, 0.35, 0.25, 0.35, 0.04);
+        } else if (flightMode && combatTicks >= flightEndsTick) {
+            flightMode = false;
+            boss.setGravity(true);
+            nextFlightTick = combatTicks + 180L + random.nextInt(121);
+            boss.getWorld().playSound(boss.getLocation(), Sound.ENTITY_VEX_DEATH, 0.55f, 1.5f);
+        }
+
+        Vector toward = target.getEyeLocation().toVector().subtract(boss.getLocation().toVector());
+        if (toward.lengthSquared() < 0.001) return;
+        Vector direction = toward.clone().normalize();
+
+        if (flightMode) {
+            boss.setGravity(false);
+            Vector velocity = direction.multiply(0.43);
+            velocity.setY(Math.max(-0.18, Math.min(0.30, toward.getY() * 0.10)));
+            boss.setVelocity(velocity);
+            if (combatTicks % 24L == 0L) shootFlightFireball(boss, target);
+            return;
+        }
+
+        // Ground phase: keep the Vex low, close distance, and use direct melee hits.
+        boss.setGravity(true);
+        Vector horizontal = new Vector(direction.getX(), 0.0, direction.getZ());
+        if (horizontal.lengthSquared() > 0.001) horizontal.normalize().multiply(0.19);
+        double lift = target.getLocation().getY() > boss.getLocation().getY() + 2.0 ? 0.13 : -0.06;
+        boss.setVelocity(new Vector(horizontal.getX(), lift, horizontal.getZ()));
+
+        if (boss.getLocation().distanceSquared(target.getLocation()) <= 5.0
+                && combatTicks >= nextMeleeTick) {
+            double damage = tierOf(boss).equals("legendary") ? 8.0
+                    : tierOf(boss).equals("rare") ? 6.0 : 4.0;
+            target.damage(damage, boss);
+            Vector knockback = target.getLocation().toVector().subtract(boss.getLocation().toVector());
+            if (knockback.lengthSquared() > 0.001) {
+                target.setVelocity(knockback.normalize().multiply(0.32).setY(0.18));
+            }
+            nextMeleeTick = combatTicks + 20L;
+        }
+
+        long attackInterval = tierOf(boss).equals("legendary") ? 50L
+                : tierOf(boss).equals("rare") ? 65L : 80L;
+        if (combatTicks % attackInterval == 0L) specialAttack(boss, target, tierOf(boss));
+        if (target.getLocation().getY() > boss.getLocation().getY() + 3.0
+                && combatTicks >= nextPillarTick) {
+            buildTemporaryStep(boss, target);
+            nextPillarTick = combatTicks + 24L;
+        }
     }
 
-    private void flyBurst(LivingEntity boss, Player target) {
-        NamespacedKey flightTag = new NamespacedKey(plugin, "boss_flight_active");
-        PersistentDataContainer pdc = boss.getPersistentDataContainer();
-        if (pdc.has(flightTag, PersistentDataType.BYTE)) return;
-        pdc.set(flightTag, PersistentDataType.BYTE, (byte)1);
-        boss.setGravity(false);
-        Vector direction = target.getLocation().clone().add(0, 1.0, 0).toVector()
-                .subtract(boss.getLocation().toVector());
-        if (direction.lengthSquared() > 0.01) {
-            boss.setVelocity(direction.normalize().multiply(0.42).setY(0.28));
+    private void shootFlightFireball(LivingEntity boss, Player target) {
+        Location origin = boss.getEyeLocation();
+        Vector direction = target.getEyeLocation().toVector().subtract(origin.toVector());
+        if (direction.lengthSquared() < 0.001) return;
+        direction.normalize();
+        SmallFireball fire = boss.getWorld().spawn(
+                origin.clone().add(direction.clone().multiply(1.1)), SmallFireball.class);
+        fire.setDirection(direction);
+        fire.setShooter(boss);
+        fire.setIsIncendiary(false);
+        fire.getPersistentDataContainer().set(projectileTag, PersistentDataType.BYTE, (byte)1);
+        boss.getWorld().playSound(origin, Sound.ENTITY_BLAZE_SHOOT, 0.7f, 1.2f);
+    }
+
+    private void buildTemporaryStep(LivingEntity boss, Player target) {
+        if (arena == null || boss.getWorld() != arena.world) return;
+        Location at = boss.getLocation();
+        int x = at.getBlockX();
+        int y = at.getBlockY() - 1;
+        int z = at.getBlockZ();
+        Location blockLocation = new Location(arena.world, x, y, z);
+        Location center = blockLocation.clone().add(0.5, 0.5, 0.5);
+        if (!isInsideArena(center) || y < arena.minY || y >= arena.maxY) return;
+        org.bukkit.block.Block block = arena.world.getBlockAt(x, y, z);
+        if (!block.getType().isAir()) return;
+        block.setType(Material.COBBLESTONE, false);
+        temporaryArenaBlocks.add(blockLocation);
+        boss.setVelocity(boss.getVelocity().setY(0.24));
+        arena.world.spawnParticle(org.bukkit.Particle.BLOCK,
+                center, 8, 0.25, 0.2, 0.25, Material.COBBLESTONE.createBlockData());
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onTemporaryArenaBlockBreak(BlockBreakEvent event) {
+        Location key = new Location(event.getBlock().getWorld(),
+                event.getBlock().getX(), event.getBlock().getY(), event.getBlock().getZ());
+        temporaryArenaBlocks.remove(key);
+    }
+
+    private void cleanupTemporaryArenaBlocks() {
+        for (Location location : new HashSet<>(temporaryArenaBlocks)) {
+            if (location.getWorld() == null) continue;
+            org.bukkit.block.Block block = location.getBlock();
+            if (block.getType() == Material.COBBLESTONE) block.setType(Material.AIR, false);
         }
-        Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            if (boss.isValid()) {
-                boss.setGravity(true);
-                boss.getPersistentDataContainer().remove(flightTag);
-            }
-        }, 80L);
+        temporaryArenaBlocks.clear();
     }
 
     private void specialAttack(LivingEntity boss, Player target, String tier) {
@@ -846,6 +956,21 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
 
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
+        Player joining = event.getPlayer();
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            if (activeBossId == null || !joining.isOnline()) return;
+            Entity active = Bukkit.getEntity(activeBossId);
+            if (!(active instanceof LivingEntity boss) || !boss.isValid()) return;
+            if (joining.getWorld().equals(boss.getWorld())
+                    && joining.getLocation().distanceSquared(boss.getLocation()) <= 48.0 * 48.0) {
+                BossBar bar = bossBars.get(activeBossId);
+                if (bar == null) {
+                    trackBoss(boss);
+                    bar = bossBars.get(activeBossId);
+                }
+                if (bar != null && !bar.getPlayers().contains(joining)) bar.addPlayer(joining);
+            }
+        });
         Long cooldownUntil = cooldowns.get(event.getPlayer().getUniqueId());
         if (cooldownUntil != null && cooldownUntil > System.currentTimeMillis()) {
             Player player = event.getPlayer();
@@ -1127,6 +1252,8 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
     }
 
     private void clearEncounterState() {
+        cleanupTemporaryArenaBlocks();
+        flightMode = false;
         if (activeBossId != null) removeBossBar(activeBossId);
         activeBossId = null;
         challengerId = null;
