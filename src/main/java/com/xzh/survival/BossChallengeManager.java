@@ -1552,7 +1552,7 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (command.getName().equalsIgnoreCase("boss") && args.length == 1) {
-            List<String> options = new ArrayList<>(List.of("common", "rare", "legendary"));
+            List<String> options = new ArrayList<>(List.of("common", "rare", "legendary", "enable", "disable"));
             for (List<String> names : BOSS_NAMES.values()) options.addAll(names);
             String prefix = args[0].toLowerCase(Locale.ROOT);
             return options.stream().filter(option -> option.toLowerCase(Locale.ROOT).startsWith(prefix)).toList();
