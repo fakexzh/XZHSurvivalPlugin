@@ -335,7 +335,8 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
             }
         }
 
-        if (challengeAvailable && now >= challengeExpiresAt) {
+        if (plugin.getConfig().getBoolean("boss-challenge.enabled", true)
+                && challengeAvailable && now >= challengeExpiresAt) {
             challengeAvailable = false;
             Bukkit.broadcastMessage("§8§m----------------------------------------");
             Bukkit.broadcastMessage("§c§lBOSS CHALLENGE EXPIRED");
@@ -343,7 +344,8 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
             Bukkit.broadcastMessage("§8§m----------------------------------------");
         }
 
-        if (!challengeAvailable && countdownPlayer == null && activeBossId == null && now >= nextChallengeAt) {
+        if (plugin.getConfig().getBoolean("boss-challenge.enabled", true)
+                && !challengeAvailable && countdownPlayer == null && activeBossId == null && now >= nextChallengeAt) {
             announceChallenge();
         }
 
@@ -1435,8 +1437,23 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
                 sender.sendMessage("§cYou do not have permission to spawn bosses.");
                 return true;
             }
+            if (args.length == 1 && (args[0].equalsIgnoreCase("enable")
+                    || args[0].equalsIgnoreCase("disable"))) {
+                boolean enabled = args[0].equalsIgnoreCase("enable");
+                plugin.getConfig().set("boss-challenge.enabled", enabled);
+                if (!enabled && challengeAvailable) {
+                    challengeAvailable = false;
+                    nextChallengeAt = System.currentTimeMillis() + HOUR_MS;
+                    plugin.getConfig().set("boss-challenge.next-challenge-at", nextChallengeAt);
+                }
+                plugin.saveConfig();
+                sender.sendMessage(enabled
+                        ? "§aGlobal boss challenges enabled. The hourly schedule will resume."
+                        : "§eGlobal boss challenges disabled. No new scheduled challenges will appear until re-enabled.");
+                return true;
+            }
             if (args.length != 1) {
-                sender.sendMessage("§eUsage: /boss <bossname|common|rare|legendary>");
+                sender.sendMessage("§eUsage: /boss <bossname|common|rare|legendary|enable|disable>");
                 return true;
             }
             if (activeBossId != null || countdownPlayer != null || challengeAvailable) {
@@ -1535,7 +1552,7 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (command.getName().equalsIgnoreCase("boss") && args.length == 1) {
-            List<String> options = new ArrayList<>(List.of("common", "rare", "legendary"));
+            List<String> options = new ArrayList<>(List.of("common", "rare", "legendary", "enable", "disable"));
             for (List<String> names : BOSS_NAMES.values()) options.addAll(names);
             String prefix = args[0].toLowerCase(Locale.ROOT);
             return options.stream().filter(option -> option.toLowerCase(Locale.ROOT).startsWith(prefix)).toList();

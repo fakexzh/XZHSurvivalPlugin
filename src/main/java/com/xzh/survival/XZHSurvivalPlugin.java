@@ -17,7 +17,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
 
-public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
+public final class XZHSurvivalPlugin extends JavaPlugin implements Listener, org.bukkit.command.CommandExecutor, org.bukkit.command.TabCompleter {
     private final Random random = new Random();
     private final Map<UUID, Integer> pendingXpRestore = new HashMap<>();
     private SurvivalFeatureManager survivalFeatureManager;
@@ -30,6 +30,14 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
     public void onEnable() {
         saveDefaultConfig();
         getServer().getPluginManager().registerEvents(this, this);
+        getServer().getPluginManager().registerEvents(new TreeChopListener(this), this);
+        org.bukkit.command.PluginCommand deathInventoryCommand = getCommand("deathinventory");
+        if (deathInventoryCommand == null) {
+            getLogger().severe("Command 'deathinventory' is missing from plugin.yml; permanent death inventory command is unavailable.");
+        } else {
+            deathInventoryCommand.setExecutor(this);
+            deathInventoryCommand.setTabCompleter(this);
+        }
         getServer().getPluginManager().registerEvents(new VillagerWorkstationResetListener(this), this);
         // Restore vanilla daylight cycling if an older plugin version left it disabled.
         for (World world : Bukkit.getWorlds()) {
@@ -54,6 +62,57 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         if (bossChallengeManager != null) bossChallengeManager.shutdown();
     }
 
+    @Override
+    public boolean onCommand(org.bukkit.command.CommandSender sender, org.bukkit.command.Command command,
+                             String label, String[] args) {
+        if (!command.getName().equalsIgnoreCase("deathinventory")) return false;
+        if (!sender.hasPermission("xzhsurvival.deathinventory.admin")) {
+            sender.sendMessage("§cYou do not have permission to change permanent death inventory.");
+            return true;
+        }
+        if (args.length != 3 || !(args[0].equalsIgnoreCase("enable")
+                || args[0].equalsIgnoreCase("disable")) || !args[1].equalsIgnoreCase("permanent")) {
+            sender.sendMessage("§eUsage: /deathinventory <enable|disable> permanent <player>");
+            return true;
+        }
+        org.bukkit.OfflinePlayer target = Bukkit.getOfflinePlayer(args[2]);
+        if (!target.isOnline() && !target.hasPlayedBefore()) {
+            sender.sendMessage("§cThat player has never joined this server.");
+            return true;
+        }
+        boolean enabled = args[0].equalsIgnoreCase("enable");
+        getConfig().set("death-inventory-permanent." + target.getUniqueId(), enabled ? true : null);
+        saveConfig();
+        sender.sendMessage(enabled
+                ? "§aPermanent death inventory enabled for " + target.getName() + " in every world. XP and bank penalties remain active."
+                : "§ePermanent death inventory disabled for " + target.getName() + ".");
+        Player online = target.getPlayer();
+        if (online != null) online.sendMessage(enabled
+                ? "§aAn administrator enabled permanent death inventory for you in every world."
+                : "§eYour permanent death inventory override was disabled by an administrator.");
+        return true;
+    }
+
+    @Override
+    public java.util.List<String> onTabComplete(org.bukkit.command.CommandSender sender,
+                                                org.bukkit.command.Command command,
+                                                String alias, String[] args) {
+        if (!command.getName().equalsIgnoreCase("deathinventory")
+                || !sender.hasPermission("xzhsurvival.deathinventory.admin")) return java.util.Collections.emptyList();
+        if (args.length == 1) return java.util.Arrays.asList("enable", "disable").stream()
+                .filter(option -> option.startsWith(args[0].toLowerCase(java.util.Locale.ROOT))).toList();
+        if (args.length == 2 && (args[0].equalsIgnoreCase("enable") || args[0].equalsIgnoreCase("disable"))) {
+            return "permanent".startsWith(args[1].toLowerCase(java.util.Locale.ROOT))
+                    ? java.util.List.of("permanent") : java.util.Collections.emptyList();
+        }
+        if (args.length == 3 && args[1].equalsIgnoreCase("permanent")) {
+            String prefix = args[2].toLowerCase(java.util.Locale.ROOT);
+            return Bukkit.getOnlinePlayers().stream().map(Player::getName)
+                    .filter(name -> name.toLowerCase(java.util.Locale.ROOT).startsWith(prefix)).toList();
+        }
+        return java.util.Collections.emptyList();
+    }
+
     @EventHandler
     public void onDeath(PlayerDeathEvent event) {
         if (!getConfig().getBoolean("death.enabled", true)) return;
@@ -62,7 +121,9 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         String dimension = environment == World.Environment.NETHER ? "nether"
                 : environment == World.Environment.THE_END ? "end" : "overworld";
 
-        boolean keep = getConfig().getBoolean("death." + dimension + ".keep-inventory",
+        boolean permanentKeep = getConfig().getBoolean(
+                "death-inventory-permanent." + player.getUniqueId(), false);
+        boolean keep = permanentKeep || getConfig().getBoolean("death." + dimension + ".keep-inventory",
                 !dimension.equals("overworld"));
         int totalXp = Math.max(0, player.getTotalExperience());
         if (keep) {

@@ -8,8 +8,12 @@ description: Survival quality-of-life and dimension death rules for XZH servers
 commands:
   boss:
     description: Spawn a boss for an arena encounter
-    usage: /boss <bossname|common|rare|legendary>
+    usage: /boss <bossname|common|rare|legendary|enable|disable>
     permission: xzhsurvival.boss.admin
+  deathinventory:
+    description: Set a player's permanent death inventory override
+    usage: /deathinventory <enable|disable> permanent <player>
+    permission: xzhsurvival.deathinventory.admin
   sorry:
     description: Surrender your active boss challenge
     usage: /sorry
@@ -18,6 +22,9 @@ commands:
     usage: /xzhboss <accept|reject>
 
 permissions:
+  xzhsurvival.deathinventory.admin:
+    description: Allows setting permanent death inventory for players
+    default: op
   xzhsurvival.boss.admin:
     description: Allows manually spawning boss encounters
     default: op
