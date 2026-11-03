@@ -30,6 +30,7 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener, org
     public void onEnable() {
         saveDefaultConfig();
         getServer().getPluginManager().registerEvents(this, this);
+        getServer().getPluginManager().registerEvents(new TreeChopListener(), this);
         if (getCommand("deathinventory") != null) getCommand("deathinventory").setExecutor(this);
         getServer().getPluginManager().registerEvents(new VillagerWorkstationResetListener(this), this);
         // Restore vanilla daylight cycling if an older plugin version left it disabled.
