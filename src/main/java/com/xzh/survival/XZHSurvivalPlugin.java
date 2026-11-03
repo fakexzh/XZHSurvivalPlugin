@@ -17,7 +17,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
 
-public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
+public final class XZHSurvivalPlugin extends JavaPlugin implements Listener, org.bukkit.command.CommandExecutor {
     private final Random random = new Random();
     private final Map<UUID, Integer> pendingXpRestore = new HashMap<>();
     private SurvivalFeatureManager survivalFeatureManager;
@@ -30,6 +30,7 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
     public void onEnable() {
         saveDefaultConfig();
         getServer().getPluginManager().registerEvents(this, this);
+        if (getCommand("deathinventory") != null) getCommand("deathinventory").setExecutor(this);
         getServer().getPluginManager().registerEvents(new VillagerWorkstationResetListener(this), this);
         // Restore vanilla daylight cycling if an older plugin version left it disabled.
         for (World world : Bukkit.getWorlds()) {
