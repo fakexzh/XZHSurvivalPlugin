@@ -54,6 +54,37 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         if (bossChallengeManager != null) bossChallengeManager.shutdown();
     }
 
+    @Override
+    public boolean onCommand(org.bukkit.command.CommandSender sender, org.bukkit.command.Command command,
+                             String label, String[] args) {
+        if (!command.getName().equalsIgnoreCase("deathinventory")) return false;
+        if (!sender.hasPermission("xzhsurvival.deathinventory.admin")) {
+            sender.sendMessage("§cYou do not have permission to change permanent death inventory.");
+            return true;
+        }
+        if (args.length != 3 || !(args[0].equalsIgnoreCase("enable")
+                || args[0].equalsIgnoreCase("disable")) || !args[1].equalsIgnoreCase("permanent")) {
+            sender.sendMessage("§eUsage: /deathinventory <enable|disable> permanent <player>");
+            return true;
+        }
+        org.bukkit.OfflinePlayer target = Bukkit.getOfflinePlayer(args[2]);
+        if (!target.isOnline() && !target.hasPlayedBefore()) {
+            sender.sendMessage("§cThat player has never joined this server.");
+            return true;
+        }
+        boolean enabled = args[0].equalsIgnoreCase("enable");
+        getConfig().set("death-inventory-permanent." + target.getUniqueId(), enabled ? true : null);
+        saveConfig();
+        sender.sendMessage(enabled
+                ? "§aPermanent death inventory enabled for " + target.getName() + " in every world. XP and bank penalties remain active."
+                : "§ePermanent death inventory disabled for " + target.getName() + ".");
+        Player online = target.getPlayer();
+        if (online != null) online.sendMessage(enabled
+                ? "§aAn administrator enabled permanent death inventory for you in every world."
+                : "§eYour permanent death inventory override was disabled by an administrator.");
+        return true;
+    }
+
     @EventHandler
     public void onDeath(PlayerDeathEvent event) {
         if (!getConfig().getBoolean("death.enabled", true)) return;
@@ -62,7 +93,9 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         String dimension = environment == World.Environment.NETHER ? "nether"
                 : environment == World.Environment.THE_END ? "end" : "overworld";
 
-        boolean keep = getConfig().getBoolean("death." + dimension + ".keep-inventory",
+        boolean permanentKeep = getConfig().getBoolean(
+                "death-inventory-permanent." + player.getUniqueId(), false);
+        boolean keep = permanentKeep || getConfig().getBoolean("death." + dimension + ".keep-inventory",
                 !dimension.equals("overworld"));
         int totalXp = Math.max(0, player.getTotalExperience());
         if (keep) {
