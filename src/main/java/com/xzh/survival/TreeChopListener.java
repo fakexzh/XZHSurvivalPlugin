@@ -3,6 +3,7 @@ package com.xzh.survival;
 import org.bukkit.Material;
 import org.bukkit.Tag;
 import org.bukkit.block.Block;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -10,16 +11,14 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
-import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.configuration.file.YamlConfiguration;
-
-import java.io.File;
-import java.io.IOException;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.plugin.java.JavaPlugin;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -30,9 +29,10 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 public final class TreeChopListener implements Listener {
-    private static final int MIN_LEAVES = 5;
+    private static final int MIN_LEAVES = 8;
     private static final int MAX_LOGS = 256;
     private static final int LEAF_SEARCH_RADIUS = 4;
+
     private final JavaPlugin plugin;
     private final Set<String> playerPlacedLogs = new HashSet<>();
     private final File placedLogsFile;
@@ -68,19 +68,20 @@ public final class TreeChopListener implements Listener {
 
         ItemStack axe = player.getInventory().getItemInMainHand();
         Set<Block> logs = findConnectedLogs(clicked);
-        if (logs.isEmpty() || countNearbyLeaves(logs) < MIN_LEAVES) return;
 
-        // Only a qualifying tree cancels the vanilla single-block interaction.
+        // A connected structure containing even one player-placed log is not a natural tree.
+        if (logs.isEmpty() || logs.stream().anyMatch(log -> playerPlacedLogs.contains(key(log)))) return;
+        if (countNearbyLeaves(logs) < MIN_LEAVES) return;
+
         event.setCancelled(true);
 
-        // Break only logs. Leaves are deliberately left completely untouched.
         for (Block log : logs) {
             if (!Tag.LOGS.isTagged(log.getType())) continue;
             List<ItemStack> drops = new ArrayList<>(log.getDrops(axe, player));
             for (ItemStack drop : drops) {
                 log.getWorld().dropItemNaturally(log.getLocation(), drop);
             }
-            // Enable block physics so vanilla leaf-distance propagation starts and natural leaves decay.
+            // Enable physics so vanilla leaf-distance propagation and decay can occur.
             log.setType(Material.AIR, true);
             damageAxeTwice(player, axe);
             if (axe.getType().isAir()) break;
@@ -95,11 +96,11 @@ public final class TreeChopListener implements Listener {
 
         while (!queue.isEmpty() && found.size() < MAX_LOGS) {
             Block current = queue.remove();
-            String key = current.getWorld().getUID() + ":" + current.getX() + ":" + current.getY() + ":" + current.getZ();
-            if (!visited.add(key) || !Tag.LOGS.isTagged(current.getType())) continue;
+            String blockKey = key(current);
+            if (!visited.add(blockKey) || !Tag.LOGS.isTagged(current.getType())) continue;
             found.add(current);
 
-            // 26-neighbour connectivity includes naturally branching tree trunks.
+            // 26-neighbour connectivity supports naturally branching tree trunks.
             for (int dx = -1; dx <= 1; dx++) {
                 for (int dy = -1; dy <= 1; dy++) {
                     for (int dz = -1; dz <= 1; dz++) {
@@ -122,9 +123,7 @@ public final class TreeChopListener implements Listener {
                         if (dx * dx + dy * dy + dz * dz > LEAF_SEARCH_RADIUS * LEAF_SEARCH_RADIUS) continue;
                         Block candidate = log.getRelative(dx, dy, dz);
                         if (!Tag.LEAVES.isTagged(candidate.getType())) continue;
-                        String key = candidate.getWorld().getUID() + ":" + candidate.getX() + ":"
-                                + candidate.getY() + ":" + candidate.getZ();
-                        leaves.add(key);
+                        leaves.add(key(candidate));
                         if (leaves.size() >= MIN_LEAVES) return leaves.size();
                     }
                 }
@@ -133,7 +132,27 @@ public final class TreeChopListener implements Listener {
         return leaves.size();
     }
 
-    private String key(Block block) {\n        return block.getWorld().getUID() + ":" + block.getX() + ":" + block.getY() + ":" + block.getZ();\n    }\n\n    private void loadPlacedLogs() {\n        if (!placedLogsFile.exists()) return;\n        placedLogsData.loadConfiguration(placedLogsFile);\n        playerPlacedLogs.addAll(placedLogsData.getStringList("blocks"));\n    }\n\n    private void savePlacedLogs() {\n        placedLogsData.set("blocks", playerPlacedLogs.stream().sorted().collect(Collectors.toList()));\n        try {\n            if (!plugin.getDataFolder().exists()) plugin.getDataFolder().mkdirs();\n            placedLogsData.save(placedLogsFile);\n        } catch (IOException exception) {\n            plugin.getLogger().warning("Could not save player-placed log tracking: " + exception.getMessage());\n        }\n    }\n\n    private boolean isAxe(Material material) {
+    private String key(Block block) {
+        return block.getWorld().getUID() + ":" + block.getX() + ":" + block.getY() + ":" + block.getZ();
+    }
+
+    private void loadPlacedLogs() {
+        if (!placedLogsFile.exists()) return;
+        YamlConfiguration loaded = YamlConfiguration.loadConfiguration(placedLogsFile);
+        playerPlacedLogs.addAll(loaded.getStringList("blocks"));
+    }
+
+    private void savePlacedLogs() {
+        placedLogsData.set("blocks", playerPlacedLogs.stream().sorted().collect(Collectors.toList()));
+        try {
+            if (!plugin.getDataFolder().exists()) plugin.getDataFolder().mkdirs();
+            placedLogsData.save(placedLogsFile);
+        } catch (IOException exception) {
+            plugin.getLogger().warning("Could not save player-placed log tracking: " + exception.getMessage());
+        }
+    }
+
+    private boolean isAxe(Material material) {
         return material.name().endsWith("_AXE");
     }
 
