@@ -1004,10 +1004,16 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onArenaMove(PlayerMoveEvent event) {
-        if (arena == null || !arena.locked || event.getTo() == null) return;
+        if (arena == null || event.getTo() == null) return;
         boolean fromInside = isInsideArena(event.getFrom());
         boolean toInside = isInsideArena(event.getTo());
-        if (fromInside != toInside) {
+        boolean acceptedPlayer = challengerId != null
+                && challengerId.equals(event.getPlayer().getUniqueId());
+        if (fromInside && !toInside && acceptedPlayer) {
+            event.setTo(event.getFrom());
+            return;
+        }
+        if (arena.locked && fromInside != toInside) {
             event.setTo(event.getFrom());
         }
     }
@@ -1119,7 +1125,7 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onChallengerTeleport(PlayerTeleportEvent event) {
-        if (activeBossId == null || challengerId == null || arena == null || !arena.locked) return;
+        if (activeBossId == null || challengerId == null || arena == null) return;
         if (!challengerId.equals(event.getPlayer().getUniqueId())) return;
         if (isInsideArena(event.getFrom()) && (event.getTo() == null || !isInsideArena(event.getTo()))) {
             UUID id = challengerId;
