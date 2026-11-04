@@ -314,7 +314,12 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
         if (arena != null && !arena.locked && now >= arena.lockAt) {
             arena.locked = true;
             emptySince = hasPlayersInsideArena() ? 0L : now;
-            Bukkit.broadcastMessage("§b§lBOSS ARENA LOCKED §8» §7Players inside are sealed in; players outside cannot enter.");
+            Entity active = activeBossId == null ? null : Bukkit.getEntity(activeBossId);
+            if (active instanceof Mob mob) {
+                mob.setAware(true);
+                mob.setAI(true);
+            }
+            Bukkit.broadcastMessage("§b§lBOSS FIGHT STARTED §8» §7The arena is now locked.");
         }
 
         if (activeBossId != null) {
@@ -325,7 +330,8 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
                 finishWithoutReward("The boss encounter ended unexpectedly.");
             } else {
                 if (arena != null && arena.locked) {
-                    if (hasPlayersInsideArena()) {
+                    if (hasPlayersInsideArena()
+                            || (challengerId != null && Bukkit.getPlayer(challengerId) == null)) {
                         emptySince = 0L;
                     } else if (emptySince == 0L) {
                         emptySince = now;
@@ -417,7 +423,7 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
         countdownPlayer = player.getUniqueId();
         countdownTier = offeredTier;
         countdownName = offeredName;
-        countdownSeconds = 10;
+        countdownSeconds = 0;
 
         if (!changeBank(player.getUniqueId(), -ENTRY_FEE)) {
             countdownPlayer = null;
@@ -429,10 +435,10 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
         Bukkit.broadcastMessage("§8§m----------------------------------------");
         Bukkit.broadcastMessage("§6§lBOSS CHALLENGE CLAIMED");
         Bukkit.broadcastMessage("§e" + player.getName() + " §faccepted " + bossDisplay(countdownName, countdownTier) + "§f!");
-        Bukkit.broadcastMessage("§7Entry fee paid: §e100 bank coins §8• §7Boss arrives in §e10 seconds§7.");
+        Bukkit.broadcastMessage("§7Entry fee paid: §e100 bank coins §8• §7Arena entry window: §e10 seconds§7.");
         Bukkit.broadcastMessage("§8§m----------------------------------------");
         player.sendMessage("§a100 coins were deducted from your bank. Prepare for the fight!");
-        player.sendTitle("§6BOSS CHALLENGE", "§f" + countdownName + " (" + tierName(countdownTier) + ") in 10 seconds", 5, 50, 10);
+        player.sendTitle("§6BOSS CHALLENGE", "§f" + countdownName + " (" + tierName(countdownTier) + ") is preparing", 5, 50, 10);
         player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 0.8f, 1.2f);
 
         countdownTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
@@ -476,7 +482,17 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
             abortCountdown(player.getUniqueId(), player.getName(), "could not enter the boss fight");
             return;
         }
-        Location challengerLocation = player.getLocation().clone();
+        Location safeChallengerLocation = findSpawnNear(player.getLocation().clone(), 0.0, 8.0);
+        if (safeChallengerLocation == null) {
+            countdownPlayer = null;
+            startCooldown(player.getUniqueId());
+            player.sendMessage("§cA safe, open fight location could not be found. Your entry fee was not refunded.");
+            showPrivateResult(player, "§cCHALLENGE FAILED", "§e3-hour cooldown started", Sound.ENTITY_VILLAGER_NO);
+            Bukkit.broadcastMessage("§cThe boss challenge could not start because no valid fight location was available.");
+            return;
+        }
+        player.teleport(safeChallengerLocation);
+        Location challengerLocation = safeChallengerLocation.clone();
         Location bossLocation = findSpawnNear(challengerLocation, 14.0, 18.0);
         if (bossLocation == null) {
             countdownPlayer = null;
@@ -488,6 +504,7 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
         }
         Location center = midpoint(challengerLocation, bossLocation);
         Arena newArena = createArena(center, challengerLocation.getY(), bossLocation.getY());
+        teleportNearbyPlayersOutside(newArena, player);
         spawnBoss(bossLocation, countdownTier, countdownName, player.getUniqueId(), player.getName(),
                 ENTRY_FEE, false, newArena);
         countdownPlayer = null;
@@ -642,14 +659,15 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
         nextPillarTick = 0L;
         trackBoss(boss);
         savePersistentState();
+        startArenaEntryCountdown(newArena);
 
         if (manual) {
             Bukkit.broadcastMessage("§6§lADMIN BOSS SPAWN §8» §f" + bossDisplay(name, tier) + " §7was spawned by §e" + acceptedName + "§7.");
         } else {
             Bukkit.broadcastMessage("§6§lBOSS CHALLENGE §8» §f" + bossDisplay(name, tier)
-                    + " §7has spawned within the 32-block boss arena, near §e" + acceptedName + "§7.");
+                    + " §7has spawned in the boss arena near §e" + acceptedName + "§7.");
         }
-        Bukkit.broadcastMessage("§bThe arena boundary is forming. §ePlayers have 5 seconds to enter before it locks.");
+        Bukkit.broadcastMessage("§bThe arena is forming. §eNearby players have 10 seconds to enter before the fight starts.");
         Player acceptedPlayer = acceptedId == null ? null : Bukkit.getPlayer(acceptedId);
         if (acceptedPlayer != null) {
             acceptedPlayer.sendMessage("§aThe boss fight has started. Anyone inside the arena can help.");
@@ -661,7 +679,7 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
         var equipment = boss.getEquipment();
         if (equipment == null) return;
         String metal = tier.equals("legendary") ? "NETHERITE" : tier.equals("rare") ? "DIAMOND" : "IRON";
-        int level = tier.equals("legendary") ? 4 : tier.equals("rare") ? 3 : 2;
+        int level = tier.equals("legendary") ? 3 : tier.equals("rare") ? 2 : 1;
         ItemStack[] armor = {
                 new ItemStack(Material.valueOf(metal + "_HELMET")),
                 new ItemStack(Material.valueOf(metal + "_CHESTPLATE")),
@@ -999,7 +1017,18 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
         }
         if (challengerId != null && challengerId.equals(event.getPlayer().getUniqueId())) {
             emptySince = 0L;
-            event.getPlayer().sendMessage("§eYour boss encounter is still active. Return to the arena if it has not ended.");
+            event.getPlayer().sendMessage("§eYour boss encounter is still active. Use /sorry to surrender.");
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                Player rejoined = Bukkit.getPlayer(event.getPlayer().getUniqueId());
+                if (rejoined == null || !rejoined.isOnline() || arena == null) return;
+                if (!isInsideArena(rejoined.getLocation())) {
+                    Location safe = findSafeInsideArena();
+                    if (safe != null) {
+                        rejoined.teleport(safe);
+                        rejoined.sendMessage("§aYou have rejoined your active boss fight.");
+                    }
+                }
+            });
         }
     }
 
@@ -1012,7 +1041,7 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
             return;
         }
         if (activeBossId != null && Objects.equals(challengerId, id)) {
-            if (!hasPlayersInsideArena()) emptySince = System.currentTimeMillis();
+            emptySince = 0L;
             Bukkit.broadcastMessage("§e" + event.getPlayer().getName()
                     + " disconnected during the boss fight. The boss will keep fighting anyone inside the arena.");
         }
@@ -1021,8 +1050,41 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
     @EventHandler
     public void onCountdownDeath(PlayerDeathEvent event) {
         UUID id = event.getEntity().getUniqueId();
+        if (activeBossId != null && Objects.equals(challengerId, id)) {
+            defeatChallenger(event.getEntity().getName(), "died during the boss fight");
+            return;
+        }
         if (Objects.equals(countdownPlayer, id)) {
             abortCountdown(id, event.getEntity().getName(), "died before the boss spawned");
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onChallengerTeleport(PlayerTeleportEvent event) {
+        if (activeBossId == null || challengerId == null || arena == null || !arena.locked) return;
+        if (!challengerId.equals(event.getPlayer().getUniqueId())) return;
+        if (isInsideArena(event.getFrom()) && (event.getTo() == null || !isInsideArena(event.getTo()))) {
+            UUID id = challengerId;
+            String name = event.getPlayer().getName();
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                if (activeBossId != null && Objects.equals(challengerId, id)) {
+                    defeatChallenger(name, "left the boss arena by teleport");
+                }
+            });
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onChallengerTeleportCommand(PlayerCommandPreprocessEvent event) {
+        if (activeBossId == null || challengerId == null || arena == null || !arena.locked) return;
+        Player player = event.getPlayer();
+        if (!challengerId.equals(player.getUniqueId()) || !isInsideArena(player.getLocation())) return;
+        String line = event.getMessage().toLowerCase(Locale.ROOT).trim();
+        String root = line.startsWith("/") ? line.substring(1).split("\\s+", 2)[0] : line;
+        root = root.contains(":") ? root.substring(root.indexOf(':') + 1) : root;
+        if (Set.of("home", "spawn", "warp", "warps", "tp", "teleport", "tpa",
+                "tpaccept", "back", "rtp", "wild", "hub", "lobby", "tphere").contains(root)) {
+            defeatChallenger(player.getName(), "attempted to leave the boss arena using /" + root);
         }
     }
 
@@ -1248,6 +1310,17 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
         finishEncounter("§cCHALLENGE ENDED", "No reward key was awarded", Sound.ENTITY_VILLAGER_NO);
     }
 
+    private void defeatChallenger(String playerName, String reason) {
+        if (activeBossId == null) return;
+        Entity boss = Bukkit.getEntity(activeBossId);
+        if (boss != null) boss.remove();
+        removeBossBar(activeBossId);
+        activeBossId = null;
+        Bukkit.broadcastMessage("§c§lBOSS CHALLENGE DEFEAT");
+        Bukkit.broadcastMessage("§e" + playerName + " §7" + reason + ". The boss despawned immediately; no reward key was awarded.");
+        finishEncounter("§cDEFEAT", "Boss fight lost • no reward", Sound.ENTITY_VILLAGER_NO);
+    }
+
     private void finishEncounter(String title, String subtitle, Sound sound) {
         UUID completedChallenger = challengerId;
         Player player = completedChallenger == null ? null : Bukkit.getPlayer(completedChallenger);
@@ -1363,6 +1436,77 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
 
     private String nameOf(LivingEntity boss) {
         return boss.getPersistentDataContainer().getOrDefault(nameTag, PersistentDataType.STRING, "Unknown");
+    }
+
+    private void teleportNearbyPlayersOutside(Arena targetArena, Player acceptedPlayer) {
+        int index = 0;
+        for (Player nearby : targetArena.world.getPlayers()) {
+            if (nearby.equals(acceptedPlayer)) continue;
+            double dx = nearby.getLocation().getX() - targetArena.centerX;
+            double dz = nearby.getLocation().getZ() - targetArena.centerZ;
+            if (dx * dx + dz * dz > 48.0 * 48.0) continue;
+            Location outside = findSafeOutsideArena(targetArena, index++);
+            if (outside != null) nearby.teleport(outside);
+        }
+    }
+
+    private Location findSafeOutsideArena(Arena targetArena, int index) {
+        for (int attempt = 0; attempt < 32; attempt++) {
+            double angle = (index * 2.399963229728653 + attempt * 0.41) % (Math.PI * 2.0);
+            double distance = 35.0 + (attempt % 4) * 1.5;
+            int x = (int)Math.floor(targetArena.centerX + Math.cos(angle) * distance);
+            int z = (int)Math.floor(targetArena.centerZ + Math.sin(angle) * distance);
+            int y = targetArena.world.getHighestBlockYAt(x, z) + 1;
+            Location candidate = new Location(targetArena.world, x + 0.5, y, z + 0.5);
+            if (isSafeSpawn(candidate)) return candidate;
+        }
+        return null;
+    }
+
+    private Location findSafeInsideArena() {
+        if (arena == null) return null;
+        for (int attempt = 0; attempt < 100; attempt++) {
+            double angle = random.nextDouble() * Math.PI * 2.0;
+            double distance = random.nextDouble() * 22.0;
+            int x = (int)Math.floor(arena.centerX + Math.cos(angle) * distance);
+            int z = (int)Math.floor(arena.centerZ + Math.sin(angle) * distance);
+            int y = arena.world.getHighestBlockYAt(x, z) + 1;
+            Location candidate = new Location(arena.world, x + 0.5, y, z + 0.5);
+            if (isInsideArena(candidate) && isSafeSpawn(candidate)) return candidate;
+        }
+        return null;
+    }
+
+    private void startArenaEntryCountdown(Arena targetArena) {
+        final int[] seconds = {10};
+        Bukkit.getScheduler().runTaskTimer(plugin, task -> {
+            if (arena != targetArena || activeBossId == null) {
+                task.cancel();
+                return;
+            }
+            for (Player player : targetArena.world.getPlayers()) {
+                double dx = player.getLocation().getX() - targetArena.centerX;
+                double dz = player.getLocation().getZ() - targetArena.centerZ;
+                if (dx * dx + dz * dz > 48.0 * 48.0) continue;
+                player.spigot().sendMessage(ChatMessageType.ACTION_BAR,
+                        TextComponent.fromLegacyText("§6BOSS FIGHT §8• §eEnter the arena: " + seconds[0] + "s"));
+                if (seconds[0] == 10 || seconds[0] == 5 || seconds[0] <= 3) {
+                    player.sendTitle("§6BOSS FIGHT", "§eEnter the arena • starts in " + seconds[0] + "s", 0, 20, 0);
+                }
+            }
+            if (seconds[0] <= 0) {
+                targetArena.locked = true;
+                Entity entity = Bukkit.getEntity(activeBossId);
+                if (entity instanceof Mob mob) {
+                    mob.setAware(true);
+                    mob.setAI(true);
+                }
+                Bukkit.broadcastMessage("§b§lBOSS FIGHT STARTED §8» §7The arena is now locked.");
+                task.cancel();
+                return;
+            }
+            seconds[0]--;
+        }, 0L, 20L);
     }
 
     private Player findTargetInsideArena(LivingEntity boss, double range) {
@@ -1529,6 +1673,11 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
                 return true;
             }
             if (activeBossId == null || challengerId == null || !challengerId.equals(player.getUniqueId())) {
+                if (Objects.equals(countdownPlayer, player.getUniqueId())) {
+                    abortCountdown(player.getUniqueId(), player.getName(), "used /sorry before the boss spawned");
+                    player.sendMessage("§eYour challenge was surrendered. The entry fee was not refunded.");
+                    return true;
+                }
                 player.sendMessage("§cOnly the player who accepted this challenge can use /sorry.");
                 return true;
             }
