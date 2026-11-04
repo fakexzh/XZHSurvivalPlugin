@@ -797,7 +797,9 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
 
         if (flightMode) {
             boss.setGravity(false);
-            Vector velocity = direction.multiply(0.48);
+            Vector orbit = new Vector(-direction.getZ(), 0.0, direction.getX())
+                    .multiply((combatTicks / 70L) % 2L == 0L ? 0.32 : -0.32);
+            Vector velocity = direction.multiply(0.42).add(orbit);
             velocity.setY(Math.max(-0.12, Math.min(0.36, toward.getY() * 0.13)));
             boss.setVelocity(velocity);
             if (combatTicks % 24L == 0L) shootFlightFireball(boss, target);
@@ -819,7 +821,9 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
             else if (rightCheck.getBlock().isPassable() && rightCheck.clone().add(0, 1, 0).getBlock().isPassable()) horizontal = right;
             else flightMode = true;
         }
-        horizontal.multiply(0.24);
+        Vector orbit = new Vector(-direction.getZ(), 0.0, direction.getX())
+                .multiply((combatTicks / 90L) % 2L == 0L ? 0.10 : -0.10);
+        horizontal.multiply(0.20).add(orbit);
         double lift = target.getLocation().getY() > boss.getLocation().getY() + 2.0 ? 0.17 : -0.04;
         boss.setVelocity(new Vector(horizontal.getX(), lift, horizontal.getZ()));
 
@@ -898,7 +902,7 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
         Vector direction = target.getEyeLocation().toVector().subtract(origin.toVector());
         if (direction.lengthSquared() < 0.001) return;
         direction.normalize();
-        int choices = tier.equals("legendary") ? 4 : tier.equals("rare") ? 3 : 2;
+        int choices = 4;
         int attack = random.nextInt(choices);
 
         if (attack == 0) {
