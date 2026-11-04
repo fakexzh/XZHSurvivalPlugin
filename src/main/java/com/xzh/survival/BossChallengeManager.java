@@ -113,6 +113,8 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
     private long nextMeleeTick;
     private long nextPillarTick;
     private boolean flightMode;
+    private Location lastBossPosition;
+    private int bossStuckTicks;
     private final Set<Location> temporaryArenaBlocks = new HashSet<>();
 
     private static final class Arena {
@@ -657,6 +659,8 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
         flightEndsTick = 0L;
         nextMeleeTick = 0L;
         nextPillarTick = 0L;
+        lastBossPosition = boss.getLocation().clone();
+        bossStuckTicks = 0;
         trackBoss(boss);
         savePersistentState();
         startArenaEntryCountdown(newArena);
@@ -762,6 +766,24 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
             mob.setAI(true);
             mob.setTarget(target);
         }
+        if (combatTicks % 10L == 0L) {
+            if (lastBossPosition != null
+                    && boss.getLocation().distanceSquared(lastBossPosition) < 0.04
+                    && boss.getLocation().distanceSquared(target.getLocation()) > 16.0) {
+                bossStuckTicks += 10;
+            } else {
+                bossStuckTicks = 0;
+            }
+            lastBossPosition = boss.getLocation().clone();
+            if (bossStuckTicks >= 30) {
+                Vector escape = target.getLocation().toVector().subtract(boss.getLocation().toVector());
+                escape.setY(0.0);
+                if (escape.lengthSquared() > 0.001) {
+                    boss.setVelocity(escape.normalize().multiply(0.48).setY(0.48));
+                }
+                bossStuckTicks = 0;
+            }
+        }
 
         if (!flightMode && combatTicks >= nextFlightTick) {
             flightMode = true;
@@ -798,6 +820,17 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
         if (horizontal.lengthSquared() > 0.001) horizontal.normalize().multiply(0.24);
         double lift = target.getLocation().getY() > boss.getLocation().getY() + 2.0 ? 0.13 : -0.06;
         boss.setVelocity(new Vector(horizontal.getX(), lift, horizontal.getZ()));
+
+        if (boss.getType() == EntityType.SKELETON
+                && boss.getLocation().distanceSquared(target.getLocation()) <= 4.0
+                && combatTicks >= nextMeleeTick) {
+            target.damage(3.0, boss);
+            Vector knockback = target.getLocation().toVector().subtract(boss.getLocation().toVector());
+            if (knockback.lengthSquared() > 0.001) {
+                target.setVelocity(knockback.normalize().multiply(0.28).setY(0.16));
+            }
+            nextMeleeTick = combatTicks + 25L;
+        }
 
         long attackInterval = tierOf(boss).equals("legendary") ? 50L
                 : tierOf(boss).equals("rare") ? 65L : 90L;
