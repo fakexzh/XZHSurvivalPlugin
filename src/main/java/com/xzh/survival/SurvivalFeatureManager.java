@@ -191,22 +191,21 @@ public final class SurvivalFeatureManager implements Listener {
     }
 
     private void updateTab(Player player) {
-        int level = getMonsterLevel(player);
         int ping = Math.max(0, player.getPing());
-        // Keep the tablist compact: username and ping on the player row; no playtime display.
+        // Keep the player row to username and ping; omit playtime and Monster Level from the tablist.
         player.setPlayerListName("§f" + player.getName() + " §8| §e" + ping + "ms");
         player.setPlayerListHeaderFooter(
                 "§d§lSURVIVAL\n§8━━━━━━━━━━━━",
-                "\n§6Level: §d" + level + "§8/§d25" + globalQuestFooter());
+                globalQuestFooter(player));
     }
 
-    private String globalQuestFooter() {
+    private String globalQuestFooter(Player player) {
         org.bukkit.plugin.Plugin economy = Bukkit.getPluginManager().getPlugin("XZHEconomySystem");
         if (economy == null || !economy.isEnabled()) return "";
         try {
             Object manager = economy.getClass().getMethod("getQuestManager").invoke(economy);
             if (manager == null) return "";
-            Object status = manager.getClass().getMethod("getGlobalQuestTabText").invoke(manager);
+            Object status = manager.getClass().getMethod("getGlobalQuestTabText", Player.class).invoke(manager, player);
             return status instanceof String text ? "\n" + text : "";
         } catch (ReflectiveOperationException ignored) {
             return "";
