@@ -82,7 +82,6 @@ public final class SurvivalFeatureManager implements Listener {
             syncLifetimePlaytime(player);
             initializeLevelAnnouncements(player);
             hideOtherPlayersHealthDisplays(player);
-            updateTab(player);
         }
         ticker = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, 20L, 20L);
         Bukkit.getScheduler().runTaskTimer(plugin, this::tryMonsterBuilding, 60L, 60L);
@@ -107,15 +106,12 @@ public final class SurvivalFeatureManager implements Listener {
         syncLifetimePlaytime(player);
         initializeLevelAnnouncements(player);
         hideOtherPlayersHealthDisplays(player);
-        updateTab(player);
-        Bukkit.getScheduler().runTask(plugin, this::refreshAllTabs);
     }
 
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
         removeHealthDisplay(event.getPlayer().getUniqueId());
         savePlaytime();
-        Bukkit.getScheduler().runTask(plugin, this::refreshAllTabs);
     }
 
     @EventHandler(ignoreCancelled = true)
@@ -173,7 +169,6 @@ public final class SurvivalFeatureManager implements Listener {
             // Keep our saved counter as a fallback, and never let lifetime playtime move backwards.
             syncLifetimePlaytime(player);
             announceLevelProgress(player);
-            updateTab(player);
             updateTargetHealth(player);
         }
         elapsedSeconds++;
@@ -188,43 +183,6 @@ public final class SurvivalFeatureManager implements Listener {
         long savedSeconds = playtimeSeconds.getOrDefault(id, 0L);
         long vanillaSeconds = Math.max(0L, player.getStatistic(Statistic.PLAY_ONE_MINUTE) / 20L);
         playtimeSeconds.put(id, Math.max(savedSeconds, vanillaSeconds));
-    }
-
-    private void updateTab(Player player) {
-        int level = getMonsterLevel(player);
-        int ping = Math.max(0, player.getPing());
-        long lifetimeSeconds = playtimeSeconds.getOrDefault(player.getUniqueId(), 0L);
-
-        // Keep each player row minimal: white username followed by a green numeric ping.
-        player.setPlayerListName("§f" + player.getName() + " §8| §e" + ping + "ms");
-        // The header/footer stay clean and show this viewer's own level and saved all-time playtime.
-        player.setPlayerListHeaderFooter(
-                "§d§lXZH SURVIVAL\n§8━━━━━━━━━━━━━━━━",
-                "\n§6Monster Level: §d" + level + "§8/§d25 §8| §bPlay Time: §f" + formatPlaytime(lifetimeSeconds) + globalQuestFooter());
-    }
-
-    private String globalQuestFooter() {
-        org.bukkit.plugin.Plugin economy = Bukkit.getPluginManager().getPlugin("XZHEconomySystem");
-        if (economy == null || !economy.isEnabled()) return "";
-        try {
-            Object manager = economy.getClass().getMethod("getQuestManager").invoke(economy);
-            if (manager == null) return "";
-            Object status = manager.getClass().getMethod("getGlobalQuestTabText").invoke(manager);
-            return status instanceof String text ? "\n§8━━━━━━━━━━━━━━━━\n" + text : "";
-        } catch (ReflectiveOperationException ignored) {
-            return "";
-        }
-    }
-
-    private void refreshAllTabs() {
-        for (Player player : Bukkit.getOnlinePlayers()) updateTab(player);
-    }
-
-    private String formatPlaytime(long seconds) {
-        long hours = seconds / 3600L;
-        long minutes = (seconds % 3600L) / 60L;
-        if (hours > 0) return hours + "h " + minutes + "m";
-        return minutes + "m";
     }
 
     private void initializeLevelAnnouncements(Player player) {
