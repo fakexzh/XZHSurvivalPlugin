@@ -192,7 +192,7 @@ public final class SurvivalFeatureManager implements Listener {
 
     private void updateTab(Player player) {
         int ping = Math.max(0, player.getPing());
-        // Keep the player row to username and ping; omit playtime and Monster Level from the tablist.
+        // Keep the player row to username and ping; omit playtime and Monster Level. Refresh the personal quest footer every tick.
         player.setPlayerListName("§f" + player.getName() + " §8| §e" + ping + "ms");
         player.setPlayerListHeaderFooter(
                 "§d§lSURVIVAL\n§8━━━━━━━━━━━━",
