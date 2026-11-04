@@ -938,7 +938,7 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
         if (attack == 2) {
             Location blastCenter = target.getLocation().clone();
             TNTPrimed tnt = boss.getWorld().spawn(blastCenter.clone().add(0.0, 0.2, 0.0), TNTPrimed.class);
-            tnt.setFuseTicks(30);
+            tnt.setFuseTicks(40);
             tnt.setYield(0.0f);
             tnt.setIsIncendiary(false);
             tnt.getPersistentDataContainer().set(projectileTag, PersistentDataType.BYTE, (byte)1);
