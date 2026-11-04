@@ -1152,9 +1152,6 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
         if (isInsideArena(event.getFrom()) != isInsideArena(event.getTo())) {
             event.getVehicle().setVelocity(new Vector(0, 0, 0));
             event.getVehicle().teleport(event.getFrom());
-            for (Entity passenger : event.getVehicle().getPassengers()) {
-
-            }
         }
     }
 
