@@ -772,7 +772,7 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
         } else if (flightMode && combatTicks >= flightEndsTick) {
             flightMode = false;
             boss.setGravity(true);
-            nextFlightTick = combatTicks + 180L + random.nextInt(121);
+            nextFlightTick = combatTicks + (tierOf(boss).equals("common") ? 240L : 180L) + random.nextInt(101);
             boss.getWorld().playSound(boss.getLocation(), Sound.ENTITY_VEX_DEATH, 0.55f, 1.5f);
         }
 
@@ -787,31 +787,20 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
             Vector velocity = direction.multiply(0.34).add(tangent);
             velocity.setY(Math.max(-0.16, Math.min(0.28, toward.getY() * 0.09)));
             boss.setVelocity(velocity);
-            if (combatTicks % 24L == 0L) shootFlightFireball(boss, target);
+            long flightAttackInterval = tierOf(boss).equals("legendary") ? 24L : tierOf(boss).equals("rare") ? 30L : 38L;
+            if (combatTicks % flightAttackInterval == 0L) shootFlightFireball(boss, target);
             return;
         }
 
-        // Ground phase: keep the Vex low, close distance, and use direct melee hits.
+        // Ground phase: native mob pathfinding handles sword pursuit; velocity helps it escape obstacles.
         boss.setGravity(true);
         Vector horizontal = new Vector(direction.getX(), 0.0, direction.getZ());
         if (horizontal.lengthSquared() > 0.001) horizontal.normalize().multiply(0.24);
         double lift = target.getLocation().getY() > boss.getLocation().getY() + 2.0 ? 0.13 : -0.06;
         boss.setVelocity(new Vector(horizontal.getX(), lift, horizontal.getZ()));
 
-        if (boss.getLocation().distanceSquared(target.getLocation()) <= 5.0
-                && combatTicks >= nextMeleeTick) {
-            double damage = tierOf(boss).equals("legendary") ? 8.0
-                    : tierOf(boss).equals("rare") ? 6.0 : 4.0;
-            target.damage(damage, boss);
-            Vector knockback = target.getLocation().toVector().subtract(boss.getLocation().toVector());
-            if (knockback.lengthSquared() > 0.001) {
-                target.setVelocity(knockback.normalize().multiply(0.32).setY(0.18));
-            }
-            nextMeleeTick = combatTicks + 20L;
-        }
-
         long attackInterval = tierOf(boss).equals("legendary") ? 50L
-                : tierOf(boss).equals("rare") ? 65L : 80L;
+                : tierOf(boss).equals("rare") ? 65L : 90L;
         if (combatTicks % attackInterval == 0L) specialAttack(boss, target, tierOf(boss));
         if (target.getLocation().getY() > boss.getLocation().getY() + 3.0
                 && combatTicks >= nextPillarTick) {
@@ -837,9 +826,13 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
     private void buildTemporaryStep(LivingEntity boss, Player target) {
         if (arena == null || boss.getWorld() != arena.world) return;
         Location at = boss.getLocation();
-        int x = at.getBlockX();
-        int y = at.getBlockY() - 1;
-        int z = at.getBlockZ();
+        Vector toward = target.getLocation().toVector().subtract(at.toVector());
+        Vector horizontal = new Vector(toward.getX(), 0.0, toward.getZ());
+        if (horizontal.lengthSquared() < 0.001) return;
+        horizontal.normalize();
+        int x = at.getBlockX() + (int)Math.round(horizontal.getX());
+        int y = at.getBlockY();
+        int z = at.getBlockZ() + (int)Math.round(horizontal.getZ());
         Location blockLocation = new Location(arena.world, x, y, z);
         Location center = blockLocation.clone().add(0.5, 0.5, 0.5);
         if (!isInsideArena(center) || y < arena.minY || y >= arena.maxY) return;
@@ -847,7 +840,7 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
         if (!block.getType().isAir()) return;
         block.setType(Material.COBBLESTONE, false);
         temporaryArenaBlocks.add(blockLocation);
-        boss.setVelocity(boss.getVelocity().setY(0.24));
+        boss.setVelocity(boss.getVelocity().setY(0.38));
         arena.world.spawnParticle(org.bukkit.Particle.BLOCK,
                 center, 8, 0.25, 0.2, 0.25, Material.COBBLESTONE.createBlockData());
     }
@@ -873,48 +866,74 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
         Vector direction = target.getEyeLocation().toVector().subtract(origin.toVector());
         if (direction.lengthSquared() < 0.001) return;
         direction.normalize();
-        int choices = tier.equals("legendary") ? 4 : tier.equals("rare") ? 3 : 2;
-        int attack = random.nextInt(choices);
+        int attack = random.nextInt(4);
 
+        // 0: Blaze-style fire shot.
         if (attack == 0) {
-            SmallFireball fire = boss.getWorld().spawn(origin.clone().add(direction.clone().multiply(1.2)), SmallFireball.class);
+            SmallFireball fire = boss.getWorld().spawn(
+                    origin.clone().add(direction.clone().multiply(1.2)), SmallFireball.class);
             fire.setDirection(direction);
             fire.setShooter(boss);
             fire.setIsIncendiary(false);
             fire.getPersistentDataContainer().set(projectileTag, PersistentDataType.BYTE, (byte)1);
-        } else if (attack == 1) {
-            Arrow arrow = boss.getWorld().spawnArrow(origin.clone().add(direction.clone().multiply(1.2)),
-                    direction, 2.4f, 2.0f);
+            boss.getWorld().playSound(origin, Sound.ENTITY_BLAZE_SHOOT, 0.8f, 1.0f);
+            return;
+        }
+
+        // 1: Aimed arrow volley. The damage scales by tier, not by fire enchantments.
+        if (attack == 1) {
+            Arrow arrow = boss.getWorld().spawnArrow(
+                    origin.clone().add(direction.clone().multiply(1.2)), direction, 2.2f, 1.5f);
             arrow.setShooter(boss);
             arrow.setFireTicks(0);
-            arrow.setDamage(tier.equals("legendary") ? 5.0 : 3.0);
+            arrow.setDamage(tier.equals("legendary") ? 5.0 : tier.equals("rare") ? 3.5 : 2.5);
             arrow.getPersistentDataContainer().set(projectileTag, PersistentDataType.BYTE, (byte)1);
-        } else if (attack == 2) {
-            Location center = target.getLocation().clone();
-            boss.getWorld().spawnParticle(org.bukkit.Particle.FLAME, center.clone().add(0, 0.8, 0),
-                    25, 0.8, 0.4, 0.8, 0.02);
-            boss.getWorld().playSound(center, Sound.ENTITY_CREEPER_PRIMED, 1.0f, 0.8f);
+            boss.getWorld().playSound(origin, Sound.ENTITY_SKELETON_SHOOT, 0.8f, 0.9f);
+            return;
+        }
+
+        // 2: Telegraph a TNT blast, then apply controlled damage without terrain griefing.
+        if (attack == 2) {
+            Location blastCenter = target.getLocation().clone();
+            TNTPrimed tnt = boss.getWorld().spawn(blastCenter.clone().add(0.0, 0.2, 0.0), TNTPrimed.class);
+            tnt.setFuseTicks(30);
+            tnt.setYield(0.0f);
+            tnt.setIsIncendiary(false);
+            tnt.getPersistentDataContainer().set(projectileTag, PersistentDataType.BYTE, (byte)1);
+            boss.getWorld().playSound(blastCenter, Sound.ENTITY_TNT_PRIMED, 0.9f, 1.0f);
+            boss.getWorld().spawnParticle(org.bukkit.Particle.FLAME, blastCenter, 16, 0.65, 0.25, 0.65, 0.01);
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                if (arena == null || center.getWorld() != arena.world) return;
-                for (Player player : center.getWorld().getPlayers()) {
-                    if (!player.isDead() && isInsideArena(player.getLocation())
-                            && player.getLocation().distanceSquared(center) <= 9.0) {
-                        player.damage(tier.equals("legendary") ? 7.0 : 4.0, boss);
-                        Vector knockback = player.getLocation().toVector().subtract(center.toVector());
-                        if (knockback.lengthSquared() > 0.001) {
-                            player.setVelocity(knockback.normalize().multiply(0.7).setY(0.35));
-                        }
+                if (!tnt.isValid()) return;
+                tnt.remove();
+                if (arena == null || blastCenter.getWorld() != arena.world) return;
+                double damage = tier.equals("legendary") ? 7.0 : tier.equals("rare") ? 5.0 : 3.0;
+                for (Player player : blastCenter.getWorld().getPlayers()) {
+                    if (player.isDead() || !isInsideArena(player.getLocation())
+                            || player.getLocation().distanceSquared(blastCenter) > 16.0) continue;
+                    player.damage(damage, boss);
+                    Vector push = player.getLocation().toVector().subtract(blastCenter.toVector());
+                    if (push.lengthSquared() > 0.001) {
+                        player.setVelocity(push.normalize().multiply(0.55).setY(0.28));
                     }
                 }
-                center.getWorld().spawnParticle(org.bukkit.Particle.EXPLOSION, center, 1);
+                blastCenter.getWorld().spawnParticle(org.bukkit.Particle.EXPLOSION, blastCenter, 1);
+                blastCenter.getWorld().playSound(blastCenter, Sound.ENTITY_GENERIC_EXPLODE, 0.8f, 1.1f);
             }, 30L);
-        } else {
-            Fireball fire = boss.getWorld().spawn(origin.clone().add(direction.clone().multiply(1.2)), Fireball.class);
-            fire.setDirection(direction);
-            fire.setShooter(boss);
-            fire.setYield(0.0f);
-            fire.setIsIncendiary(false);
-            fire.getPersistentDataContainer().set(projectileTag, PersistentDataType.BYTE, (byte)1);
+            return;
+        }
+
+        // 3: Close the gap with a sword charge.
+        Vector charge = target.getLocation().toVector().subtract(boss.getLocation().toVector());
+        if (charge.lengthSquared() > 0.001) {
+            boss.setVelocity(charge.normalize().multiply(tier.equals("legendary") ? 0.72
+                    : tier.equals("rare") ? 0.62 : 0.52).setY(0.18));
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                if (!boss.isValid() || boss.isDead() || !target.isOnline()
+                        || !isInsideArena(target.getLocation())) return;
+                if (boss.getLocation().distanceSquared(target.getLocation()) <= 9.0) {
+                    target.damage(tier.equals("legendary") ? 5.0 : tier.equals("rare") ? 3.5 : 2.5, boss);
+                }
+            }, 8L);
         }
     }
 
