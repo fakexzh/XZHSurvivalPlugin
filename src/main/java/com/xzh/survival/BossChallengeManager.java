@@ -761,7 +761,7 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
             if (boss instanceof Mob mob) mob.setAI(false);
             return;
         }
-        Player target = findTargetInsideArena(boss, 80.0);
+        Player target = findTargetInsideArena(boss, 100.0);
         if (target == null) {
             if (boss instanceof Mob mob) mob.setTarget(null);
             return;
