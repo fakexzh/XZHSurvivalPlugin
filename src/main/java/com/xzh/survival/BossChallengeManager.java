@@ -33,7 +33,6 @@ import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.entity.EntityTargetLivingEntityEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.world.ChunkLoadEvent;
-import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
@@ -1139,20 +1138,6 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
                     defeatChallenger(name, "left the boss arena by teleport");
                 }
             });
-        }
-    }
-
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
-    public void onChallengerTeleportCommand(PlayerCommandPreprocessEvent event) {
-        if (activeBossId == null || challengerId == null || arena == null || !arena.locked) return;
-        Player player = event.getPlayer();
-        if (!challengerId.equals(player.getUniqueId()) || !isInsideArena(player.getLocation())) return;
-        String line = event.getMessage().toLowerCase(Locale.ROOT).trim();
-        String root = line.startsWith("/") ? line.substring(1).split("\\s+", 2)[0] : line;
-        root = root.contains(":") ? root.substring(root.indexOf(':') + 1) : root;
-        if (Set.of("home", "spawn", "warp", "warps", "tp", "teleport", "tpa",
-                "tpaccept", "back", "rtp", "wild", "hub", "lobby", "tphere").contains(root)) {
-            defeatChallenger(player.getName(), "attempted to leave the boss arena using /" + root);
         }
     }
 
