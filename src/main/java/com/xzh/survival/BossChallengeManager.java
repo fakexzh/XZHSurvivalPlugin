@@ -63,7 +63,7 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
     private static final long EMPTY_ARENA_MS = 5L * 60L * 1000L;
     private static final int ENTRY_FEE = 100;
     private static final int ARENA_RADIUS = 32;
-    private static final int ARENA_HEIGHT = 12;
+    private static final int ARENA_HEIGHT = 32;
     private static final long ENTRY_WINDOW_TICKS = 100L;
 
     private static final Map<String, List<String>> BOSS_NAMES = Map.of(
@@ -304,7 +304,13 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
         arena = new Arena(boss.getWorld(), centerX, centerZ, minY, maxY);
         arena.locked = true;
         arena.lockAt = 0L;
-        emptySince = hasPlayersInsideArena() ? 0L : System.currentTimeMillis();
+        boss.removePotionEffect(PotionEffectType.SPEED);
+        if (boss instanceof Mob mob) {
+            mob.setAware(true);
+            mob.setAI(true);
+        }
+        emptySince = hasPlayersInsideArena() || (challengerId != null && Bukkit.getPlayer(challengerId) == null)
+                ? 0L : System.currentTimeMillis();
         trackBoss(boss);
         plugin.getLogger().info("Restored active boss encounter: " + name + " (" + tier + ").");
     }
@@ -589,7 +595,7 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
     private Arena createArena(Location center, double firstY, double secondY) {
         int low = (int)Math.floor(Math.min(firstY, secondY)) - 2;
         int high = Math.max(low + ARENA_HEIGHT, (int)Math.ceil(Math.max(firstY, secondY)) + 3);
-        if (high - low > 24) high = low + 24;
+        if (high - low > 48) high = low + 48;
         return new Arena(center.getWorld(), center.getX(), center.getZ(), low, high);
     }
 
