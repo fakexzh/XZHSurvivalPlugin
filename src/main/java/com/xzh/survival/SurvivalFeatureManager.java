@@ -193,14 +193,11 @@ public final class SurvivalFeatureManager implements Listener {
     private void updateTab(Player player) {
         int level = getMonsterLevel(player);
         int ping = Math.max(0, player.getPing());
-        long lifetimeSeconds = playtimeSeconds.getOrDefault(player.getUniqueId(), 0L);
-
-        // Keep each player row minimal: white username followed by a green numeric ping.
+        // Keep the tablist compact: username and ping on the player row; no playtime display.
         player.setPlayerListName("§f" + player.getName() + " §8| §e" + ping + "ms");
-        // The header/footer stay clean and show this viewer's own level and saved all-time playtime.
         player.setPlayerListHeaderFooter(
-                "§d§lXZH SURVIVAL\n§8━━━━━━━━━━━━━━━━",
-                "\n§6Monster Level: §d" + level + "§8/§d25 §8| §bPlay Time: §f" + formatPlaytime(lifetimeSeconds) + globalQuestFooter());
+                "§d§lSURVIVAL\n§8━━━━━━━━━━━━",
+                "\n§6Level: §d" + level + "§8/§d25" + globalQuestFooter());
     }
 
     private String globalQuestFooter() {
@@ -210,7 +207,7 @@ public final class SurvivalFeatureManager implements Listener {
             Object manager = economy.getClass().getMethod("getQuestManager").invoke(economy);
             if (manager == null) return "";
             Object status = manager.getClass().getMethod("getGlobalQuestTabText").invoke(manager);
-            return status instanceof String text ? "\n§8━━━━━━━━━━━━━━━━\n" + text : "";
+            return status instanceof String text ? "\n" + text : "";
         } catch (ReflectiveOperationException ignored) {
             return "";
         }
@@ -233,7 +230,7 @@ public final class SurvivalFeatureManager implements Listener {
         int currentLevel = getMonsterLevel(player);
         long savedSeconds = playtimeSeconds.getOrDefault(id, 0L);
         if (savedSeconds == 0L) {
-            Bukkit.broadcastMessage("§d§lXZH Survival §8» §f@" + player.getName() + " §ahas reached Monster Level 1!");
+            Bukkit.broadcastMessage("§8[§dSURVIVAL§8] §f" + player.getName() + " §ahas reached Monster Level §d1§a.");
             announcedMonsterLevels.put(id, 1);
         } else {
             // Avoid spamming old level announcements for players already established before this update.
@@ -251,7 +248,7 @@ public final class SurvivalFeatureManager implements Listener {
         }
         if (currentLevel <= previousAnnounced) return;
         for (int level = previousAnnounced + 1; level <= currentLevel; level++) {
-            Bukkit.broadcastMessage("§d§lXZH Survival §8» §f@" + player.getName() + " §ahas reached Monster Level " + level + "!");
+            Bukkit.broadcastMessage("§8[§dSURVIVAL§8] §f" + player.getName() + " §ahas reached Monster Level §d" + level + "§a.");
         }
         announcedMonsterLevels.put(id, currentLevel);
         savePlaytime();

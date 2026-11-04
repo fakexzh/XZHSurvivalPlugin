@@ -115,8 +115,6 @@ public final class AdventureLootManager implements Listener {
             return;
         }
         if (!plugin.getConfig().getBoolean("adventure-loot.fishing.enabled", true)) return;
-        event.getPlayer().sendMessage("§b§l🎣 FISHING §8» §fCaught §e" + caught.getItemStack().getAmount()
-                + "x §f" + prettyName(caught.getItemStack().getType()) + "§b!");
         double coinChance = plugin.getConfig().getDouble("adventure-loot.fishing.coin-chance", 0.06);
         if (random.nextDouble() < coinChance) {
             ItemStack coin = rollCoinReward("adventure-loot.mob-loot");

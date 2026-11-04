@@ -170,9 +170,9 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
             if (!clean.isBlank()) reason = clean;
         }
 
-        Bukkit.broadcastMessage("§c☠ " + player.getName() + " died! §7(" + reason + ")");
-        Bukkit.broadcastMessage("§6Lost " + money(coinsLost) + " coins §8• §cXP lost: " + xpPercent + "%");
-        Bukkit.broadcastMessage("§bUse /back §7or §abuy your last inventory in /shop §7(Death Inventory).");
+        Bukkit.broadcastMessage("§8[§dSURVIVAL§8] §f" + player.getName() + " §cdied §8(" + reason + "§8).");
+        Bukkit.broadcastMessage("§8[§dSURVIVAL§8] §7Lost §6" + money(coinsLost)
+                + " coins §8• §7XP: §c" + xpPercent + "% §8• §7Recover items: §a/shop");
     }
 
     private String money(double amount) {
