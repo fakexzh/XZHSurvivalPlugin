@@ -88,7 +88,8 @@ combat-indicators:
   target-range: 6.0
 
 # Global boss challenges run on a fixed hourly schedule.
-# Entry fee: 100 bank coins. Spawn distance: 16 blocks.
+# Entry fee: 100 bank coins. Arena radius: 32 blocks.
+# Boss models: Common Skeleton, Rare Piglin Brute, Legendary Wither Skeleton.
 # Rewards are written onto the glowing key: Common 350-500, Rare 500-1000, Legendary 1500-2500.
 
 
