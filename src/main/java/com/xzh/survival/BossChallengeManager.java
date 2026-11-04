@@ -824,8 +824,12 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
         boss.setGravity(true);
         Vector horizontal = new Vector(direction.getX(), 0.0, direction.getZ());
         if (horizontal.lengthSquared() > 0.001) horizontal.normalize().multiply(0.24);
-        double lift = target.getLocation().getY() > boss.getLocation().getY() + 2.0 ? 0.13 : -0.06;
-        boss.setVelocity(new Vector(horizontal.getX(), lift, horizontal.getZ()));
+        double vertical = boss.getVelocity().getY();
+        if (target.getLocation().getY() > boss.getLocation().getY() + 2.0 && vertical < 0.20) {
+            vertical = 0.20;
+        }
+        vertical = Math.max(-0.25, Math.min(0.55, vertical));
+        boss.setVelocity(new Vector(horizontal.getX(), vertical, horizontal.getZ()));
 
         if (boss.getType() == EntityType.SKELETON
                 && boss.getLocation().distanceSquared(target.getLocation()) <= 4.0
