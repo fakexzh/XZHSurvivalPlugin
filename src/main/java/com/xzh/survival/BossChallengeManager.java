@@ -1154,8 +1154,13 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
 
     @EventHandler(ignoreCancelled = true)
     public void onVehicleMove(VehicleMoveEvent event) {
-        if (arena == null || !arena.locked) return;
-        if (isInsideArena(event.getFrom()) != isInsideArena(event.getTo())) {
+        if (arena == null) return;
+        boolean crossing = isInsideArena(event.getFrom()) != isInsideArena(event.getTo());
+        if (!crossing) return;
+        boolean carryingAcceptor = challengerId != null && event.getVehicle().getPassengers().stream()
+                .anyMatch(passenger -> passenger instanceof Player player
+                        && player.getUniqueId().equals(challengerId));
+        if (arena.locked || carryingAcceptor) {
             event.getVehicle().setVelocity(new Vector(0, 0, 0));
             event.getVehicle().teleport(event.getFrom());
         }
