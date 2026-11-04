@@ -287,6 +287,7 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
             Bukkit.broadcastMessage("§cA pending boss challenge was cancelled because an existing encounter was restored. The entry fee was not refunded.");
         }
         activeBossId = boss.getUniqueId();
+        boss.removePotionEffect(PotionEffectType.SPEED);
         PersistentDataContainer pdc = boss.getPersistentDataContainer();
         String tier = pdc.getOrDefault(tierTag, PersistentDataType.STRING, "common");
         String name = pdc.getOrDefault(nameTag, PersistentDataType.STRING, "Unknown");
@@ -1179,7 +1180,8 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
     public void onBossExplosion(EntityExplodeEvent event) {
         if (isBoss(event.getEntity()) || isTaggedBossProjectile(event.getEntity())) {
             event.blockList().clear();
-            event.setCancelled(true);
+            // Keep tagged TNT damage active, but never allow boss explosives to damage terrain.
+            if (isBoss(event.getEntity())) event.setCancelled(true);
         }
     }
 
@@ -1189,8 +1191,7 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
     }
 
     private boolean isTaggedBossProjectile(Entity entity) {
-        return entity instanceof Projectile projectile
-                && projectile.getPersistentDataContainer().has(projectileTag, PersistentDataType.BYTE);
+        return entity.getPersistentDataContainer().has(projectileTag, PersistentDataType.BYTE);
     }
 
     private boolean isBossDamager(Entity entity) {
