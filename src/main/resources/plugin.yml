@@ -8,7 +8,7 @@ description: Survival quality-of-life and dimension death rules for XZH servers
 commands:
   boss:
     description: Spawn a boss for an arena encounter
-    usage: /boss <bossname|common|rare|legendary>
+    usage: /boss <easy|rare|legendary|bossname|enable|disable>
     permission: xzhsurvival.boss.admin
   sorry:
     description: Surrender your active boss challenge
