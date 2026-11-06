@@ -733,7 +733,7 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
             double max = boss.getAttribute(Attribute.MAX_HEALTH) == null
                     ? boss.getHealth() : boss.getAttribute(Attribute.MAX_HEALTH).getValue();
             bar.setProgress(Math.max(0.0, Math.min(1.0, boss.getHealth() / Math.max(1.0, max))));
-            bar.setTitle(bossDisplay(nameOf(boss), tierOf(boss) + " §8• §c"
+            bar.setTitle(bossDisplay(nameOf(boss), tierOf(boss)) + " §8• §c"
                     + (int)Math.ceil(boss.getHealth()) + "§7/§c" + (int)max + " HP");
             for (Player player : Bukkit.getOnlinePlayers()) {
                 if (player.getWorld().equals(boss.getWorld())
@@ -795,6 +795,7 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
         if (stuckTicks >= 40) {
             flightMode = true;
             flightEndsTick = combatTicks + 45L;
+            nextFlightTick = flightEndsTick + 180L + random.nextInt(121);
             stuckTicks = 0;
             Vector recovery = target.getEyeLocation().toVector().subtract(boss.getLocation().toVector());
             if (recovery.lengthSquared() > 0.001) {
@@ -1130,9 +1131,11 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
     public void onArenaTeleport(PlayerTeleportEvent event) {
         if (arena == null || event.getTo() == null) return;
         Player player = event.getPlayer();
-        if (activeBossId != null && Objects.equals(challengerId, player.getUniqueId())
-                && !isInsideArena(event.getTo())) {
-            forfeitActiveChallenge(player, "teleported out of the boss arena");
+        if (activeBossId != null && Objects.equals(challengerId, player.getUniqueId())) {
+            if (!isInsideArena(event.getTo())) {
+                forfeitActiveChallenge(player, "teleported out of the boss arena");
+                return;
+            }
             return;
         }
         if (!arena.locked) return;
