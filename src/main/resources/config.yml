@@ -87,9 +87,11 @@ combat-indicators:
   target-health-enabled: true
   target-range: 6.0
 
-# Global boss challenges run on a fixed hourly schedule.
-# Entry fee: 100 bank coins. Spawn distance: 16 blocks.
-# Rewards are written onto the glowing key: Common 350-500, Rare 500-1000, Legendary 1500-2500.
+# Global boss challenges run on a fixed hourly schedule when enabled.
+# Arena radius: 32 blocks. Entry fee: 100 bank coins. Nearby players get 10 seconds to enter.
+# Rewards are written onto the glowing key: Easy 350-500, Rare 500-1000, Legendary 1500-2500.
+boss-challenge:
+  enabled: true
 
 
 # Breaking a villager's workstation releases the nearest matching villager and clears its trades.
