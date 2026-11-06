@@ -475,10 +475,20 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
         if (countdownTask != null) countdownTask.cancel();
         countdownTask = null;
         countdownPlayer = null;
-        startCooldown(playerId);
-        Bukkit.broadcastMessage("§c" + playerName + " " + reason + ". The 100-coin entry fee was not refunded.");
+        boolean refunded = refundEntryFee(playerId);
+        String refundMessage = refunded
+                ? " The 100-coin entry fee was refunded; no cooldown was applied."
+                : " The entry-fee refund failed; an administrator must review the bank transaction.";
+        Bukkit.broadcastMessage("§c" + playerName + " " + reason + "." + refundMessage);
         Player player = Bukkit.getPlayer(playerId);
-        if (player != null) showPrivateResult(player, "§cCHALLENGE FORFEITED", "§e3-hour cooldown started", Sound.ENTITY_VILLAGER_NO);
+        if (player != null) {
+            showPrivateResult(player, "§cCHALLENGE CANCELLED",
+                    refunded ? "§a100 coins refunded • no cooldown" : "§cRefund failed • contact an admin",
+                    Sound.ENTITY_VILLAGER_NO);
+            player.sendMessage(refunded
+                    ? "§aYour 100-coin entry fee was returned. No cooldown was applied because the boss had not spawned."
+                    : "§cYour entry-fee refund could not be completed. Please contact an administrator.");
+        }
     }
 
     private void spawnGlobalEncounter(Player player) {
@@ -490,10 +500,17 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
         Location bossLocation = findSpawnNear(challengerLocation, 14.0, 18.0);
         if (bossLocation == null) {
             countdownPlayer = null;
-            startCooldown(player.getUniqueId());
-            player.sendMessage("§cNo safe boss spawn location was found. Your entry fee was not refunded.");
-            showPrivateResult(player, "§cCHALLENGE FAILED", "§e3-hour cooldown started", Sound.ENTITY_VILLAGER_NO);
-            Bukkit.broadcastMessage("§cThe boss challenge could not start because no safe spawn location was found. The entry fee was not refunded.");
+            boolean refunded = refundEntryFee(player.getUniqueId());
+            String result = refunded
+                    ? "§a100 coins refunded • no cooldown"
+                    : "§cRefund failed • contact an admin";
+            player.sendMessage(refunded
+                    ? "§cNo safe boss spawn location was found. Your 100-coin entry fee was refunded; no cooldown was applied."
+                    : "§cNo safe boss spawn location was found, and the entry-fee refund failed. Please contact an administrator.");
+            showPrivateResult(player, "§cCHALLENGE FAILED", result, Sound.ENTITY_VILLAGER_NO);
+            Bukkit.broadcastMessage(refunded
+                    ? "§cThe boss challenge could not start because no safe spawn location was found. The entry fee was refunded."
+                    : "§cThe boss challenge could not start and its entry-fee refund failed. An administrator must review the bank transaction.");
             return;
         }
         Location center = midpoint(challengerLocation, bossLocation);
@@ -588,11 +605,22 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
         if (!(entity instanceof LivingEntity boss)) {
             entity.remove();
             if (acceptedId != null) {
-                startCooldown(acceptedId);
+                boolean refunded = refundEntryFee(acceptedId);
                 Player player = Bukkit.getPlayer(acceptedId);
-                if (player != null) showPrivateResult(player, "§cCHALLENGE FAILED", "§e3-hour cooldown started", Sound.ENTITY_VILLAGER_NO);
+                if (player != null) {
+                    showPrivateResult(player, "§cCHALLENGE FAILED",
+                            refunded ? "§a100 coins refunded • no cooldown" : "§cRefund failed • contact an admin",
+                            Sound.ENTITY_VILLAGER_NO);
+                    player.sendMessage(refunded
+                            ? "§cThe boss could not be spawned. Your entry fee was refunded; no cooldown was applied."
+                            : "§cThe boss could not be spawned and the entry-fee refund failed. Please contact an administrator.");
+                }
+                Bukkit.broadcastMessage(refunded
+                        ? "§cThe boss could not be spawned. The entry fee was refunded."
+                        : "§cThe boss could not be spawned and the entry-fee refund failed. An administrator must review the bank transaction.");
+            } else {
+                Bukkit.broadcastMessage("§cThe admin boss could not be spawned.");
             }
-            Bukkit.broadcastMessage("§cThe boss could not be spawned. No entry-fee refund is available.");
             return;
         }
 
@@ -1397,6 +1425,16 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
             plugin.getLogger().warning("Could not read bank balance for boss challenge: " + ex.getClass().getSimpleName());
             return -1.0;
         }
+    }
+
+    private boolean refundEntryFee(UUID playerId) {
+        boolean refunded = changeBank(playerId, ENTRY_FEE);
+        if (!refunded) {
+            plugin.getLogger().severe("Could not refund the " + ENTRY_FEE
+                    + "-coin boss challenge entry fee to " + playerId
+                    + ". Manual bank review is required.");
+        }
+        return refunded;
     }
 
     private boolean changeBank(UUID id, double delta) {
