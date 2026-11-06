@@ -749,7 +749,10 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
                 tier.equals("legendary") ? BarColor.RED : tier.equals("rare") ? BarColor.PURPLE : BarColor.BLUE,
                 BarStyle.SOLID);
         bar.setVisible(true);
-        bossBars.put(boss.getUniqueId(    private void updateBoss(LivingEntity boss) {
+        bossBars.put(boss.getUniqueId(), bar);
+    }
+
+    private void updateBoss(LivingEntity boss) {
         updateBossChunkTicket(boss);
         BossBar bar = bossBars.get(boss.getUniqueId());
         if (bar == null) {
@@ -783,13 +786,6 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
         }
     }
 
-ckInterval == 0L) specialAttack(boss, target, tierOf(boss));
-        if (target.getLocation().getY() > boss.getLocation().getY() + 3.0
-                && combatTicks >= nextPillarTick) {
-            buildTemporaryStep(boss, target);
-            nextPillarTick = combatTicks + 24L;
-        }
-    }
 
     private void shootFlightFireball(LivingEntity boss, Player target) {
         Location origin = boss.getEyeLocation();
