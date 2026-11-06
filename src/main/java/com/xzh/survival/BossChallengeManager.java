@@ -752,6 +752,14 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
         bossBars.put(boss.getUniqueId(), bar);
     }
 
+    private void combatTick() {
+        if (activeBossId == null) return;
+        Entity entity = Bukkit.getEntity(activeBossId);
+        if (!(entity instanceof LivingEntity boss) || !boss.isValid() || boss.isDead()) return;
+        combatTicks++;
+        updateBoss(boss);
+    }
+
     private void updateBoss(LivingEntity boss) {
         updateBossChunkTicket(boss);
         BossBar bar = bossBars.get(boss.getUniqueId());
