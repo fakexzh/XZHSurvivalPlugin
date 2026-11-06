@@ -215,6 +215,21 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
 
     public void shutdown() {
         if (countdownTask != null) countdownTask.cancel();
+        countdownTask = null;
+        if (countdownPlayer != null) {
+            UUID pendingPlayerId = countdownPlayer;
+            countdownPlayer = null;
+            boolean refunded = refundEntryFee(pendingPlayerId);
+            Player pendingPlayer = Bukkit.getPlayer(pendingPlayerId);
+            if (pendingPlayer != null) {
+                pendingPlayer.sendMessage(refunded
+                        ? "§eThe boss challenge was cancelled during a plugin restart. Your 100-coin entry fee was refunded; no cooldown was applied."
+                        : "§cThe boss challenge was cancelled during a plugin restart, but the entry-fee refund failed. Please contact an administrator.");
+            }
+            if (!refunded) {
+                plugin.getLogger().severe("Boss countdown was cancelled during shutdown, but its entry-fee refund failed for " + pendingPlayerId + ".");
+            }
+        }
         for (BossBar bar : bossBars.values()) bar.removeAll();
         bossBars.clear();
         if (bossChunkTicket != null) {
