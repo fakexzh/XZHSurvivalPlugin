@@ -847,7 +847,7 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
                 else if (rightCheck.getBlock().isPassable() && rightCheck.clone().add(0, 1, 0).getBlock().isPassable()) horizontal = right;
                 else {
                     flightMode = true;
-                    if (boss instanceof Mob mob) mob.setAI(false);
+                    mob.setAI(false);
                 }
             }
             Vector orbit = new Vector(-direction.getZ(), 0.0, direction.getX())
