@@ -114,8 +114,6 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
     private long nextMeleeTick;
     private long nextPillarTick;
     private boolean flightMode;
-    private Location lastBossLocation;
-    private int stuckTicks;
     private final Set<Location> temporaryArenaBlocks = new HashSet<>();
 
     private static final class Arena {
@@ -612,7 +610,7 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
             mob.setAware(false);
             mob.setAI(false);
         }
-        boss.setGravity(false);
+        boss.setGravity(true);
 
         PersistentDataContainer pdc = boss.getPersistentDataContainer();
         pdc.set(bossTag, PersistentDataType.BYTE, (byte)1);
@@ -637,8 +635,6 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
         arena = newArena;
         arena.locked = false;
         arena.lockAt = System.currentTimeMillis() + 10_000L;
-        lastBossLocation = null;
-        stuckTicks = 0;
         if (!manual && acceptedId != null) prepareArenaEntry(newArena, acceptedId);
         emptySince = 0L;
         flightMode = false;
@@ -718,12 +714,6 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
 
     private void updateBoss(LivingEntity boss) {
         updateBossChunkTicket(boss);
-        boss.setGravity(false);
-        if (boss instanceof Mob mob) {
-            mob.setAware(false);
-            mob.setAI(false);
-        }
-
         BossBar bar = bossBars.get(boss.getUniqueId());
         if (bar == null) {
             trackBoss(boss);
@@ -737,7 +727,7 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
                     + (int)Math.ceil(boss.getHealth()) + "§7/§c" + (int)max + " HP");
             for (Player player : Bukkit.getOnlinePlayers()) {
                 if (player.getWorld().equals(boss.getWorld())
-                        && player.getLocation().distanceSquared(boss.getLocation()) <= 64.0 * 64.0) {
+                        && player.getLocation().distanceSquared(boss.getLocation()) <= 48.0 * 48.0) {
                     if (!bar.getPlayers().contains(player)) bar.addPlayer(player);
                 } else {
                     bar.removePlayer(player);
@@ -745,70 +735,44 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
             }
         }
 
-        Player target = findTargetInsideArena(boss, 72.0);
+        Player target = findTargetInsideArena(boss, 40.0);
         if (target == null) {
-            flightMode = false;
-            stuckTicks = 0;
-            lastBossLocation = boss.getLocation().clone();
-            boss.setVelocity(new Vector(0, 0, 0));
+            boss.setVelocity(new Vector(0, flightMode ? 0 : -0.04, 0));
             return;
         }
 
-        Vector toward = target.getEyeLocation().toVector().subtract(boss.getEyeLocation().toVector());
-        if (toward.lengthSquared() < 0.001) return;
-        Vector direction = toward.clone().normalize();
-
         if (!flightMode && combatTicks >= nextFlightTick) {
             flightMode = true;
-            flightEndsTick = combatTicks + 55L + random.nextInt(26);
+            flightEndsTick = combatTicks + 65L + random.nextInt(26);
+            boss.setGravity(false);
             boss.getWorld().playSound(boss.getLocation(), Sound.ENTITY_VEX_CHARGE, 0.9f, 1.15f);
             boss.getWorld().spawnParticle(org.bukkit.Particle.CLOUD, boss.getLocation(), 12, 0.35, 0.25, 0.35, 0.04);
         } else if (flightMode && combatTicks >= flightEndsTick) {
             flightMode = false;
+            boss.setGravity(true);
             nextFlightTick = combatTicks + 180L + random.nextInt(121);
             boss.getWorld().playSound(boss.getLocation(), Sound.ENTITY_VEX_DEATH, 0.55f, 1.5f);
         }
 
-        double minY = arena == null ? boss.getWorld().getMinHeight() + 2.0 : arena.minY + 2.0;
-        double maxY = arena == null ? boss.getWorld().getMaxHeight() - 3.0 : arena.maxY - 2.0;
-        double bossY = boss.getLocation().getY();
-        double targetY = Math.max(minY, Math.min(maxY, target.getEyeLocation().getY() - 1.0));
-
-        Vector horizontal = new Vector(direction.getX(), 0.0, direction.getZ());
-        if (horizontal.lengthSquared() > 0.001) horizontal.normalize();
-        Vector orbit = new Vector(-horizontal.getZ(), 0.0, horizontal.getX())
-                .multiply((combatTicks / 70L) % 2L == 0L ? 0.035 : -0.035);
-        horizontal.multiply(flightMode ? 0.30 : 0.21).add(orbit);
-
-        double vertical = Math.max(-0.12, Math.min(0.12, (targetY - bossY) * (flightMode ? 0.075 : 0.055)));
-        if (bossY <= minY) vertical = Math.max(0.06, vertical);
-        if (bossY >= maxY) vertical = Math.min(-0.06, vertical);
-        boss.setVelocity(new Vector(horizontal.getX(), vertical, horizontal.getZ()));
-
-        if (lastBossLocation != null && boss.getLocation().distanceSquared(lastBossLocation) < 0.0025
-                && boss.getLocation().distanceSquared(target.getLocation()) > 9.0) {
-            stuckTicks++;
-        } else {
-            stuckTicks = 0;
-        }
-        lastBossLocation = boss.getLocation().clone();
-        if (stuckTicks >= 40) {
-            flightMode = true;
-            flightEndsTick = combatTicks + 45L;
-            nextFlightTick = flightEndsTick + 180L + random.nextInt(121);
-            stuckTicks = 0;
-            Vector recovery = target.getEyeLocation().toVector().subtract(boss.getLocation().toVector());
-            if (recovery.lengthSquared() > 0.001) {
-                recovery.normalize().multiply(0.38);
-                recovery.setY(Math.max(-0.10, Math.min(0.16, recovery.getY())));
-                boss.setVelocity(recovery);
-            }
-        }
+        Vector toward = target.getEyeLocation().toVector().subtract(boss.getLocation().toVector());
+        if (toward.lengthSquared() < 0.001) return;
+        Vector direction = toward.clone().normalize();
 
         if (flightMode) {
+            boss.setGravity(false);
+            Vector velocity = direction.multiply(0.43);
+            velocity.setY(Math.max(-0.18, Math.min(0.30, toward.getY() * 0.10)));
+            boss.setVelocity(velocity);
             if (combatTicks % 24L == 0L) shootFlightFireball(boss, target);
             return;
         }
+
+        // Ground phase: keep the Vex low, close distance, and use direct melee hits.
+        boss.setGravity(true);
+        Vector horizontal = new Vector(direction.getX(), 0.0, direction.getZ());
+        if (horizontal.lengthSquared() > 0.001) horizontal.normalize().multiply(0.19);
+        double lift = target.getLocation().getY() > boss.getLocation().getY() + 2.0 ? 0.13 : -0.06;
+        boss.setVelocity(new Vector(horizontal.getX(), lift, horizontal.getZ()));
 
         if (boss.getLocation().distanceSquared(target.getLocation()) <= 5.0
                 && combatTicks >= nextMeleeTick) {
