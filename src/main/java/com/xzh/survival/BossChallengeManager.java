@@ -615,8 +615,13 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
     private void spawnBoss(Location location, String tier, String name, UUID acceptedId,
                            String acceptedName, int fee, boolean manual, Arena newArena) {
         tier = canonicalTier(tier);
-        // Vex supplies the visible wings and native flying model; movement and attack phases are controlled below.
-        Entity entity = location.getWorld().spawnEntity(location, EntityType.VEX);
+        // Keep the intended vanilla boss mobs: Easy = Skeleton, Rare = Piglin, Legendary = Wither Skeleton.
+        EntityType bossType = switch (tier) {
+            case "rare" -> EntityType.PIGLIN;
+            case "legendary" -> EntityType.WITHER_SKELETON;
+            default -> EntityType.SKELETON;
+        };
+        Entity entity = location.getWorld().spawnEntity(location, bossType);
         if (!(entity instanceof LivingEntity boss)) {
             entity.remove();
             if (acceptedId != null) {
@@ -649,9 +654,9 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
         boss.setCustomNameVisible(true);
         boss.setGlowing(true);
         boss.setRemoveWhenFarAway(false);
-        if (boss instanceof Mob mob) {
-            mob.setAware(false);
-            mob.setAI(false);
+        // Leave native mob AI enabled so each vanilla mob uses its own normal movement and combat behaviour.
+        if (boss instanceof Piglin piglin) {
+            piglin.setImmuneToZombification(true);
         }
         boss.setGravity(true);
 
@@ -744,18 +749,7 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
                 tier.equals("legendary") ? BarColor.RED : tier.equals("rare") ? BarColor.PURPLE : BarColor.BLUE,
                 BarStyle.SOLID);
         bar.setVisible(true);
-        bossBars.put(boss.getUniqueId(), bar);
-    }
-
-    private void combatTick() {
-        if (activeBossId == null) return;
-        Entity entity = Bukkit.getEntity(activeBossId);
-        if (!(entity instanceof LivingEntity boss) || !boss.isValid() || boss.isDead()) return;
-        combatTicks++;
-        updateBoss(boss);
-    }
-
-    private void updateBoss(LivingEntity boss) {
+        bossBars.put(boss.getUniqueId(    private void updateBoss(LivingEntity boss) {
         updateBossChunkTicket(boss);
         BossBar bar = bossBars.get(boss.getUniqueId());
         if (bar == null) {
@@ -778,60 +772,18 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
             }
         }
 
+        // Let the actual Minecraft mob handle pathfinding and its native weapon behaviour.
         Player target = findTargetInsideArena(boss, 40.0);
-        if (target == null) {
-            boss.setVelocity(new Vector(0, flightMode ? 0 : -0.04, 0));
-            return;
-        }
-
-        if (!flightMode && combatTicks >= nextFlightTick) {
-            flightMode = true;
-            flightEndsTick = combatTicks + 65L + random.nextInt(26);
-            boss.setGravity(false);
-            boss.getWorld().playSound(boss.getLocation(), Sound.ENTITY_VEX_CHARGE, 0.9f, 1.15f);
-            boss.getWorld().spawnParticle(org.bukkit.Particle.CLOUD, boss.getLocation(), 12, 0.35, 0.25, 0.35, 0.04);
-        } else if (flightMode && combatTicks >= flightEndsTick) {
-            flightMode = false;
-            boss.setGravity(true);
-            nextFlightTick = combatTicks + 180L + random.nextInt(121);
-            boss.getWorld().playSound(boss.getLocation(), Sound.ENTITY_VEX_DEATH, 0.55f, 1.5f);
-        }
-
-        Vector toward = target.getEyeLocation().toVector().subtract(boss.getLocation().toVector());
-        if (toward.lengthSquared() < 0.001) return;
-        Vector direction = toward.clone().normalize();
-
-        if (flightMode) {
-            boss.setGravity(false);
-            Vector velocity = direction.multiply(0.43);
-            velocity.setY(Math.max(-0.18, Math.min(0.30, toward.getY() * 0.10)));
-            boss.setVelocity(velocity);
-            if (combatTicks % 24L == 0L) shootFlightFireball(boss, target);
-            return;
-        }
-
-        // Ground phase: keep the Vex low, close distance, and use direct melee hits.
-        boss.setGravity(true);
-        Vector horizontal = new Vector(direction.getX(), 0.0, direction.getZ());
-        if (horizontal.lengthSquared() > 0.001) horizontal.normalize().multiply(0.19);
-        double lift = target.getLocation().getY() > boss.getLocation().getY() + 2.0 ? 0.13 : -0.06;
-        boss.setVelocity(new Vector(horizontal.getX(), lift, horizontal.getZ()));
-
-        if (boss.getLocation().distanceSquared(target.getLocation()) <= 5.0
-                && combatTicks >= nextMeleeTick) {
-            double damage = tierOf(boss).equals("legendary") ? 8.0
-                    : tierOf(boss).equals("rare") ? 6.0 : 4.0;
-            target.damage(damage, boss);
-            Vector knockback = target.getLocation().toVector().subtract(boss.getLocation().toVector());
-            if (knockback.lengthSquared() > 0.001) {
-                target.setVelocity(knockback.normalize().multiply(0.32).setY(0.18));
+        if (boss instanceof Mob mob) {
+            if (target != null) {
+                mob.setTarget(target);
+            } else if (mob.getTarget() != null && !isInsideArena(mob.getTarget().getLocation())) {
+                mob.setTarget(null);
             }
-            nextMeleeTick = combatTicks + 20L;
         }
+    }
 
-        long attackInterval = tierOf(boss).equals("legendary") ? 50L
-                : tierOf(boss).equals("rare") ? 65L : 80L;
-        if (combatTicks % attackInterval == 0L) specialAttack(boss, target, tierOf(boss));
+ckInterval == 0L) specialAttack(boss, target, tierOf(boss));
         if (target.getLocation().getY() > boss.getLocation().getY() + 3.0
                 && combatTicks >= nextPillarTick) {
             buildTemporaryStep(boss, target);
