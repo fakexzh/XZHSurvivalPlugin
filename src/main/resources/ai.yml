@@ -3,6 +3,8 @@ provider:
   model: gemini-3.6-flash
   api-key-env: GEMINI_API_KEY
   request-timeout-seconds: 15
+server-knowledge: ""
+
 npc:
   enabled: true
   name: "Survival Guide"
