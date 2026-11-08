@@ -45,7 +45,7 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         farmingManager.start();
         bossChallengeManager = new BossChallengeManager(this);
         bossChallengeManager.start();
-        getLogger().info("XZH Survival Plugin enabled.");
+        getLogger().info("Survival plugin enabled.");
     }
 
     @Override
@@ -96,7 +96,7 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
             penalty = low + random.nextInt(Math.max(1, high - low + 1));
         }
 
-        // Replace vanilla's automatic death line with one consistent, global XZH announcement.
+        // Replace vanilla's automatic death line with one consistent, global announcement.
         String vanillaDeathMessage = event.getDeathMessage();
         event.setDeathMessage(null);
         double actualPenalty = deductBank(player, penalty);
