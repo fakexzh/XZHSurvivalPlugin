@@ -40,6 +40,7 @@ public final class TimeCycleManager implements Listener, CommandExecutor, TabCom
     private double nightMinutes;
     private boolean enabled;
     private boolean paused;
+    private boolean started;
     private int taskId = -1;
 
     private static final class WorldState {
@@ -63,9 +64,18 @@ public final class TimeCycleManager implements Listener, CommandExecutor, TabCom
                 synchronizeAdvanceTimeRule(world);
             }
         }
-        if (enabled) {
+        started = true;
+        updateTaskState();
+    }
+
+    private void updateTaskState() {
+        if (enabled && taskId == -1) {
             taskId = Bukkit.getScheduler().scheduleSyncRepeatingTask(plugin, this::tick, 1L, 1L);
+        } else if (!enabled && taskId != -1) {
+            Bukkit.getScheduler().cancelTask(taskId);
+            taskId = -1;
         }
+        if (started) synchronizeAllWorldRules();
     }
 
     public void shutdown() {
@@ -86,6 +96,7 @@ public final class TimeCycleManager implements Listener, CommandExecutor, TabCom
         dayMinutes = clampDuration(plugin.getConfig().getDouble("custom-time.day-duration-minutes", 20.0));
         nightMinutes = clampDuration(plugin.getConfig().getDouble("custom-time.night-duration-minutes", 10.0));
         states.values().forEach(state -> state.fractionalTicks = 0.0);
+        updateTaskState();
     }
 
     private static double clampDuration(double minutes) {
@@ -274,10 +285,15 @@ public final class TimeCycleManager implements Listener, CommandExecutor, TabCom
             sender.sendMessage("§cThe phase cannot be changed while a player is sleeping.");
             return;
         }
-        world.setTime(night ? NIGHT_START : DAY_START);
+        long current = Math.floorMod(world.getTime(), CYCLE_LENGTH);
+        if (night && current < NIGHT_START) {
+            world.setTime(NIGHT_START);
+        } else if (!night && current >= NIGHT_START) {
+            world.setTime(DAY_START);
+        }
         WorldState state = states.computeIfAbsent(world.getUID(), ignored -> new WorldState());
         state.fractionalTicks = 0.0;
-        sender.sendMessage(night ? "§7The world has switched to night." : "§7The world has switched to day.");
+        sender.sendMessage(night ? "§7The world is now in its night phase." : "§7The world is now in its day phase.");
     }
 
     private void setDuration(CommandSender sender, String[] args, boolean day) {
