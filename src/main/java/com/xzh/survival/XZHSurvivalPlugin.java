@@ -30,6 +30,7 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
     private DynamicTradingManager dynamicTradingManager;
     private FarmingManager farmingManager;
     private BossChallengeManager bossChallengeManager;
+    private TimeCycleManager timeCycleManager;
 
     @Override
     public void onEnable() {
@@ -37,10 +38,6 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         saveDefaultConfig();
         getServer().getPluginManager().registerEvents(this, this);
         getServer().getPluginManager().registerEvents(new VillagerWorkstationResetListener(this), this);
-        // Restore vanilla daylight cycling if an older plugin version left it disabled.
-        for (World world : Bukkit.getWorlds()) {
-            world.setGameRule(org.bukkit.GameRule.DO_DAYLIGHT_CYCLE, true);
-        }
         survivalFeatureManager = new SurvivalFeatureManager(this);
         survivalFeatureManager.start();
         adventureLootManager = new AdventureLootManager(this);
@@ -51,6 +48,8 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         farmingManager.start();
         bossChallengeManager = new BossChallengeManager(this);
         bossChallengeManager.start();
+        timeCycleManager = new TimeCycleManager(this);
+        timeCycleManager.start();
         getLogger().info("Survival plugin enabled.");
     }
 
@@ -81,6 +80,7 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
     public void onDisable() {
         if (survivalFeatureManager != null) survivalFeatureManager.shutdown();
         if (bossChallengeManager != null) bossChallengeManager.shutdown();
+        if (timeCycleManager != null) timeCycleManager.shutdown();
     }
 
     @EventHandler
