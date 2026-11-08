@@ -19,7 +19,6 @@ commands:
   timecycle:
     description: Manage independent day and night durations
     usage: /timecycle <status|day|night|setday|setnight|pause|resume|reload|reset>
-    permission: survival.timecycle.admin
 
 permissions:
   survival.timecycle.admin:
