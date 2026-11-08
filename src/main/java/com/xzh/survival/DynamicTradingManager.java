@@ -38,8 +38,8 @@ public final class DynamicTradingManager implements Listener {
 
     public DynamicTradingManager(JavaPlugin plugin) {
         this.plugin = plugin;
-        specialKey = new NamespacedKey(plugin, "xzh_special_trade");
-        cycleKey = new NamespacedKey(plugin, "xzh_trade_cycle");
+        specialKey = new NamespacedKey("xzhsurvivalplugin", "xzh_special_trade");
+        cycleKey = new NamespacedKey("xzhsurvivalplugin", "xzh_trade_cycle");
     }
 
     public void start() {
