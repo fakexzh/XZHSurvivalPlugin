@@ -69,13 +69,14 @@ public final class TimeCycleManager implements Listener, CommandExecutor, TabCom
     }
 
     private void updateTaskState() {
+        if (!started) return;
         if (enabled && taskId == -1) {
             taskId = Bukkit.getScheduler().scheduleSyncRepeatingTask(plugin, this::tick, 1L, 1L);
         } else if (!enabled && taskId != -1) {
             Bukkit.getScheduler().cancelTask(taskId);
             taskId = -1;
         }
-        if (started) synchronizeAllWorldRules();
+        synchronizeAllWorldRules();
     }
 
     public void shutdown() {
