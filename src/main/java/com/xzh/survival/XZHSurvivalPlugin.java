@@ -31,6 +31,7 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
     private FarmingManager farmingManager;
     private BossChallengeManager bossChallengeManager;
     private TimeCycleManager timeCycleManager;
+    private GeminiNpcManager geminiNpcManager;
 
     @Override
     public void onEnable() {
@@ -50,6 +51,7 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         bossChallengeManager.start();
         timeCycleManager = new TimeCycleManager(this);
         timeCycleManager.start();
+        geminiNpcManager = new GeminiNpcManager(this);
         getLogger().info("Survival plugin enabled.");
     }
 
@@ -81,6 +83,7 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         if (survivalFeatureManager != null) survivalFeatureManager.shutdown();
         if (bossChallengeManager != null) bossChallengeManager.shutdown();
         if (timeCycleManager != null) timeCycleManager.shutdown();
+        if (geminiNpcManager != null) geminiNpcManager.shutdown();
     }
 
     @EventHandler
@@ -99,8 +102,6 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
             event.getDrops().clear();
         } else {
             event.setKeepInventory(false);
-            // If keepInventory gamerule left Bukkit's list empty, explicitly add the
-            // player's inventory so the Overworld death cannot silently erase it.
             if (event.getDrops().isEmpty()) {
                 for (ItemStack item : player.getInventory().getContents()) {
                     if (item != null && !item.getType().isAir()) event.getDrops().add(item.clone());
@@ -113,7 +114,6 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         int percent = min + random.nextInt(Math.max(1, max - min + 1));
         int loss = Math.round(totalXp * percent / 100.0f);
         pendingXpRestore.put(player.getUniqueId(), Math.max(0, totalXp - loss));
-        // Overworld loss becomes XP orbs; Nether/End keep inventory and lose XP on respawn.
         event.setDroppedExp(keep ? 0 : loss);
 
         int penalty;
@@ -125,7 +125,6 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
             penalty = low + random.nextInt(Math.max(1, high - low + 1));
         }
 
-        // Replace vanilla's automatic death line with one consistent, global announcement.
         String vanillaDeathMessage = event.getDeathMessage();
         event.setDeathMessage(null);
         double actualPenalty = deductBank(player, penalty);
@@ -148,9 +147,7 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
 
     private int overworldPenalty(Player player) {
         Location home = player.getBedSpawnLocation();
-        if (home == null) {
-            return getConfig().getInt("death.overworld.no-home-penalty", 50);
-        }
+        if (home == null) return getConfig().getInt("death.overworld.no-home-penalty", 50);
         if (home.getWorld() == null || home.getWorld() != player.getWorld()) {
             return getConfig().getInt("death.overworld.no-home-penalty", 50);
         }
@@ -205,6 +202,6 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
     }
 
     private String money(double amount) {
-        return String.format(java.util.Locale.US, "%.2f", amount).replaceAll("\\.00$", "");
+        return String.format(java.util.Locale.US, "%.2f", amount).replaceAll("\\\\.00$", "");
     }
 }
