@@ -24,6 +24,6 @@ tasks.withType<JavaCompile>().configureEach {
 }
 
 tasks.jar {
-    archiveBaseName.set("XZHSurvivalPlugin")
+    archiveBaseName.set("SurvivalPlugin")
     archiveVersion.set(project.version.toString())
 }
