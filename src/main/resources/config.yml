@@ -1,3 +1,11 @@
+# Independent Overworld day and night durations. Sleeping uses vanilla night-skip behavior.
+custom-time:
+  enabled: true
+  day-duration-minutes: 20.0
+  night-duration-minutes: 10.0
+  # Empty means every loaded Overworld. Otherwise list exact world folder names.
+  worlds: []
+
 # Replant mature crops from their harvest drops and award small vanilla XP orbs.
 farming:
   enabled: true
