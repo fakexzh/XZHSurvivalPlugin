@@ -163,9 +163,9 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
             plugin.getCommand("boss").setTabCompleter(this);
         }
         if (plugin.getCommand("sorry") != null) plugin.getCommand("sorry").setExecutor(this);
-        if (plugin.getCommand("xzhboss") != null) {
-            plugin.getCommand("xzhboss").setExecutor(this);
-            plugin.getCommand("xzhboss").setTabCompleter(this);
+        if (plugin.getCommand("bosschallenge") != null) {
+            plugin.getCommand("bosschallenge").setExecutor(this);
+            plugin.getCommand("bosschallenge").setTabCompleter(this);
         }
     }
 
@@ -394,13 +394,13 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
         Bukkit.broadcastMessage("§7Entry fee: §e100 bank coins §8• §7Possible reward: " + rewardRange(offeredTier));
         Bukkit.broadcastMessage("§7First player to accept claims the challenge. Expires in §e5 minutes§7.");
         TextComponent accept = new TextComponent("§a§l[ ACCEPT ]");
-        accept.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/xzhboss accept"));
+        accept.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/bosschallenge accept"));
         accept.setHoverEvent(new net.md_5.bungee.api.chat.HoverEvent(
                 net.md_5.bungee.api.chat.HoverEvent.Action.SHOW_TEXT,
                 TextComponent.fromLegacyText("§aAccept this boss challenge and pay 100 bank coins.")));
         TextComponent spacer = new TextComponent("     ");
         TextComponent reject = new TextComponent("§c§l[ REJECT ]");
-        reject.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/xzhboss reject"));
+        reject.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/bosschallenge reject"));
         reject.setHoverEvent(new net.md_5.bungee.api.chat.HoverEvent(
                 net.md_5.bungee.api.chat.HoverEvent.Action.SHOW_TEXT,
                 TextComponent.fromLegacyText("§cDismiss this invitation. It remains available to other players.")));
@@ -1655,13 +1655,13 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
             return true;
         }
 
-        if (commandName.equals("xzhboss")) {
+        if (commandName.equals("bosschallenge")) {
             if (!(sender instanceof Player player)) {
                 sender.sendMessage("Only players can accept or reject a boss challenge.");
                 return true;
             }
             if (args.length != 1) {
-                player.sendMessage("§eUsage: /xzhboss accept|reject");
+                player.sendMessage("§eUsage: /bosschallenge accept|reject");
                 return true;
             }
             if (args[0].equalsIgnoreCase("accept")) {
@@ -1670,7 +1670,7 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
                 if (!challengeAvailable) player.sendMessage("§cThere is no active challenge to reject.");
                 else player.sendMessage("§7You dismissed the invitation. Other players can still accept it.");
             } else {
-                player.sendMessage("§eUsage: /xzhboss accept|reject");
+                player.sendMessage("§eUsage: /bosschallenge accept|reject");
             }
             return true;
         }
@@ -1685,7 +1685,7 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
             String prefix = args[0].toLowerCase(Locale.ROOT);
             return options.stream().filter(option -> option.toLowerCase(Locale.ROOT).startsWith(prefix)).toList();
         }
-        if (command.getName().equalsIgnoreCase("xzhboss") && args.length == 1) {
+        if (command.getName().equalsIgnoreCase("bosschallenge") && args.length == 1) {
             return List.of("accept", "reject").stream()
                     .filter(option -> option.startsWith(args[0].toLowerCase(Locale.ROOT))).toList();
         }
