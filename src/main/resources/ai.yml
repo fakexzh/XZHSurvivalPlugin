@@ -1,0 +1,17 @@
+enabled: false
+provider:
+  model: gemini-3.6-flash
+  api-key-env: GEMINI_API_KEY
+  request-timeout-seconds: 15
+npc:
+  enabled: true
+  name: "Survival Guide"
+conversation:
+  max-history-messages: 10
+  expire-after-minutes: 30
+limits:
+  player-cooldown-seconds: 5
+  max-concurrent-requests: 3
+  max-question-characters: 400
+  max-response-characters: 350
+  max-output-tokens: 220
