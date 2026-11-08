@@ -1,1 +1,1 @@
-rootProject.name = "XZHSurvivalPlugin"
+rootProject.name = "SurvivalPlugin"
