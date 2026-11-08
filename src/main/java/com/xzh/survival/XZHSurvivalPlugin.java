@@ -202,6 +202,6 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
     }
 
     private String money(double amount) {
-        return String.format(java.util.Locale.US, "%.2f", amount).replaceAll("\\\\.00$", "");
+        return String.format(java.util.Locale.US, "%.2f", amount).replaceAll("\\.00$", "");
     }
 }
