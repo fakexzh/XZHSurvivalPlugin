@@ -90,6 +90,7 @@ public final class GeminiNpcManager implements Listener, CommandExecutor, TabCom
         npcName = settings.getString("npc.name", "Survival Guide");
         timeoutSeconds = clamp(settings.getInt("provider.request-timeout-seconds", 15), 5, 60);
         historyLimit = clamp(settings.getInt("conversation.max-history-messages", 10), 2, 20);
+        if ((historyLimit & 1) != 0) historyLimit--;
         expiryMinutes = clamp(settings.getInt("conversation.expire-after-minutes", 30), 1, 1440);
         cooldownSeconds = clamp(settings.getInt("limits.player-cooldown-seconds", 5), 1, 120);
         maxConcurrent = clamp(settings.getInt("limits.max-concurrent-requests", 3), 1, 3);
@@ -130,7 +131,14 @@ public final class GeminiNpcManager implements Listener, CommandExecutor, TabCom
         }
         player.sendMessage("§6[Guide] §fHello! Ask me a question in chat.");
         player.sendMessage("§7Your question is sent to Google Gemini. Do not share private information.");
-        player.sendMessage("§7Type §ecancel §7to close this prompt.");
+        player.sendMessage("§7Type §ecancel §7to close this prompt. It expires after 60 seconds.");
+        UUID playerId = player.getUniqueId();
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (awaitingQuestion.remove(playerId)) {
+                Player online = Bukkit.getPlayer(playerId);
+                if (online != null) online.sendMessage("§6[Guide] §7Your question prompt expired.");
+            }
+        }, 20L * 60L);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
