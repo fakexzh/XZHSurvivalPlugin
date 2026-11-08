@@ -3,7 +3,7 @@ version: 1.0.0
 main: com.xzh.survival.XZHSurvivalPlugin
 api-version: '26.3'
 softdepend: [XZHEconomySystem]
-description: Survival quality-of-life and dimension death rules for XZH servers
+description: Survival quality-of-life and dimension death rules
 
 commands:
   boss:
@@ -13,9 +13,9 @@ commands:
   sorry:
     description: Surrender your active boss challenge
     usage: /sorry
-  xzhboss:
+  bosschallenge:
     description: Accept or reject a global boss challenge
-    usage: /xzhboss <accept|reject>
+    usage: /bosschallenge <accept|reject>
 
 permissions:
   xzhsurvival.boss.admin:
