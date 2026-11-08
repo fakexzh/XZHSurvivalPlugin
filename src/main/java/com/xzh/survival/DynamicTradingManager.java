@@ -86,7 +86,7 @@ public final class DynamicTradingManager implements Listener {
             List<MerchantRecipe> recipes = new ArrayList<>(base);
             recipes.addAll(makeSpecialOffers(entity instanceof WanderingTrader));
             merchant.setRecipes(recipes);
-            event.getPlayer().sendMessage("§d[XZH Trader] §7Special offers refreshed. Each special offer can be used once this cycle.");
+            event.getPlayer().sendMessage("§d[Trader] §7Special offers refreshed. Each special offer can be used once this cycle.");
         } else {
             // Keep the current cycle's use counts; never recreate offers just because a player reopens the menu.
             List<MerchantRecipe> current = merchant.getRecipes();
@@ -101,9 +101,9 @@ public final class DynamicTradingManager implements Listener {
 
     private List<MerchantRecipe> makeSpecialOffers(boolean wandering) {
         List<MerchantRecipe> offers = new ArrayList<>();
-        // NPC buys selected goods from players and pays with authentic physical XZH coins.
+        // NPC buys selected goods from players and pays with physical coins.
         // Approximate the economy shop's current resale values, then vary offers so not every deal is best-in-server.
-        // Shop sell values: iron 7.5 each, gold 12 each, diamond 5 each. Output is physical XZH coin currency.
+        // Shop sell values: iron 7.5 each, gold 12 each, diamond 5 each. Output is physical coin currency.
         addOffer(offers, createOfficialCoin(10, 13 + random.nextInt(3)), new ItemStack(Material.IRON_INGOT, 16));
         addOffer(offers, createOfficialCoin(10, 5 + random.nextInt(2)), new ItemStack(Material.GOLD_INGOT, 4));
         addOffer(offers, createOfficialCoin(1, 4 + random.nextInt(3)), new ItemStack(Material.DIAMOND, 1));
@@ -129,7 +129,7 @@ public final class DynamicTradingManager implements Listener {
         ItemStack rare = new ItemStack(Material.EXPERIENCE_BOTTLE, 1);
         ItemMeta rareMeta = rare.getItemMeta();
         if (rareMeta != null) {
-            rareMeta.setDisplayName("§5Limited XZH Supply");
+            rareMeta.setDisplayName("§5Limited Supply");
             rareMeta.getPersistentDataContainer().set(specialKey, PersistentDataType.BYTE, (byte) 1);
             rare.setItemMeta(rareMeta);
         }
@@ -178,7 +178,7 @@ public final class DynamicTradingManager implements Listener {
             create.setAccessible(true);
             return (ItemStack) create.invoke(manager, denomination, amount);
         } catch (ReflectiveOperationException | RuntimeException ex) {
-            plugin.getLogger().warning("Could not create trader XZH coin: " + ex.getClass().getSimpleName());
+            plugin.getLogger().warning("Could not create trader coin: " + ex.getClass().getSimpleName());
             return null;
         }
     }
