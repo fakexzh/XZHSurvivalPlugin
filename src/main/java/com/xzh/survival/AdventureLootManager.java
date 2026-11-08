@@ -194,7 +194,7 @@ public final class AdventureLootManager implements Listener {
         if (!plugin.getConfig().getBoolean("adventure-loot.enabled", true)) return;
         if (event.getLootTable() == null || event.getLootTable().getKey() == null
                 || !event.getLootTable().getKey().getKey().endsWith("buried_treasure")) return;
-        // Add actual custom XZH coin items to the generated vanilla buried-treasure loot.
+        // Add custom coin items to the generated vanilla buried-treasure loot.
         ItemStack tenCoins = createOfficialCoin(10, 2 + random.nextInt(7));
         ItemStack singleCoins = createOfficialCoin(1, 10 + random.nextInt(21));
         if (tenCoins != null) event.getLoot().add(tenCoins);
@@ -223,7 +223,7 @@ public final class AdventureLootManager implements Listener {
         if (coin == null) return;
         Map<Integer, ItemStack> overflow = chest.getBlockInventory().addItem(coin);
         for (ItemStack item : overflow.values()) chest.getWorld().dropItemNaturally(chest.getLocation(), item);
-        player.sendMessage("§6[XZH] §eYou discovered XZH coins hidden in this village chest!");
+        player.sendMessage("§6§eYou discovered coins hidden in this village chest!");
     }
 
     @EventHandler(ignoreCancelled = true)
@@ -301,7 +301,7 @@ public final class AdventureLootManager implements Listener {
             create.setAccessible(true);
             return (ItemStack) create.invoke(manager, denomination, amount);
         } catch (ReflectiveOperationException | RuntimeException ex) {
-            plugin.getLogger().warning("Could not create official XZH coin loot: " + ex.getClass().getSimpleName());
+            plugin.getLogger().warning("Could not create coin loot: " + ex.getClass().getSimpleName());
             return null;
         }
     }
