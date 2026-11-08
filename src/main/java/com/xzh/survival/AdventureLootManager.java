@@ -40,12 +40,12 @@ public final class AdventureLootManager implements Listener {
 
     public AdventureLootManager(JavaPlugin plugin) {
         this.plugin = plugin;
-        mobLootKey = new NamespacedKey(plugin, "mob_loot_pickup");
-        villageChestCheckedKey = new NamespacedKey(plugin, "village_coin_checked");
-        monsterLevelKey = new NamespacedKey(plugin, "monster_level");
-        fishingQuestProgressKey = new NamespacedKey(plugin, "fishing_quest_progress");
-        pickupAnnouncedKey = new NamespacedKey(plugin, "loot_pickup_announced");
-        lootSourceKey = new NamespacedKey(plugin, "loot_source");
+        mobLootKey = new NamespacedKey("xzhsurvivalplugin", "mob_loot_pickup");
+        villageChestCheckedKey = new NamespacedKey("xzhsurvivalplugin", "village_coin_checked");
+        monsterLevelKey = new NamespacedKey("xzhsurvivalplugin", "monster_level");
+        fishingQuestProgressKey = new NamespacedKey("xzhsurvivalplugin", "fishing_quest_progress");
+        pickupAnnouncedKey = new NamespacedKey("xzhsurvivalplugin", "loot_pickup_announced");
+        lootSourceKey = new NamespacedKey("xzhsurvivalplugin", "loot_source");
     }
 
     public void start() {
