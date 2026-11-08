@@ -22,6 +22,8 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.http.*;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.attribute.PosixFilePermission;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
@@ -45,8 +47,10 @@ public final class GeminiNpcManager implements Listener, CommandExecutor, TabCom
     private final HttpClient httpClient;
     private final ExecutorService executor;
     private final File settingsFile;
+    private final File secretsFile;
 
     private YamlConfiguration settings;
+    private YamlConfiguration secrets;
     private boolean enabled, npcEnabled;
     private String model, apiKeyEnvironment, npcName;
     private int timeoutSeconds, historyLimit, expiryMinutes, cooldownSeconds;
@@ -62,7 +66,9 @@ public final class GeminiNpcManager implements Listener, CommandExecutor, TabCom
             return thread;
         });
         settingsFile = new File(plugin.getDataFolder(), "ai.yml");
+        secretsFile = new File(plugin.getDataFolder(), "secrets.yml");
         if (!settingsFile.exists()) plugin.saveResource("ai.yml", false);
+        if (!secretsFile.exists()) plugin.saveResource("secrets.yml", false);
         reloadSettings();
         Bukkit.getPluginManager().registerEvents(this, plugin);
         PluginCommand command = plugin.getCommand("survivalnpc");
@@ -82,6 +88,8 @@ public final class GeminiNpcManager implements Listener, CommandExecutor, TabCom
 
     private void reloadSettings() {
         settings = YamlConfiguration.loadConfiguration(settingsFile);
+        secrets = YamlConfiguration.loadConfiguration(secretsFile);
+        restrictSecretsFilePermissions();
         enabled = settings.getBoolean("enabled", false);
         npcEnabled = settings.getBoolean("npc.enabled", true);
         model = settings.getString("provider.model", "gemini-3.6-flash").trim();
@@ -98,16 +106,32 @@ public final class GeminiNpcManager implements Listener, CommandExecutor, TabCom
         maxResponseChars = clamp(settings.getInt("limits.max-response-characters", 350), 80, 1000);
         maxOutputTokens = clamp(settings.getInt("limits.max-output-tokens", 220), 32, 1024);
         if (enabled && apiKey() == null) {
-            plugin.getLogger().warning("Gemini is enabled but environment variable " + apiKeyEnvironment + " is missing.");
+            plugin.getLogger().warning("Gemini is enabled but no API key was found. Set " + apiKeyEnvironment
+                    + " or add gemini.api-key to plugins/Survival/secrets.yml.");
         }
     }
 
     private int clamp(int value, int min, int max) { return Math.max(min, Math.min(max, value)); }
 
     private String apiKey() {
-        if (apiKeyEnvironment.isBlank()) return null;
-        String key = System.getenv(apiKeyEnvironment);
-        return key == null || key.isBlank() ? null : key.trim();
+        if (!apiKeyEnvironment.isBlank()) {
+            String environmentKey = System.getenv(apiKeyEnvironment);
+            if (environmentKey != null && !environmentKey.isBlank()) return environmentKey.trim();
+        }
+        String fileKey = secrets == null ? null : secrets.getString("gemini.api-key", "");
+        return fileKey == null || fileKey.isBlank() ? null : fileKey.trim();
+    }
+
+    private void restrictSecretsFilePermissions() {
+        try {
+            Files.setPosixFilePermissions(secretsFile.toPath(), EnumSet.of(
+                    PosixFilePermission.OWNER_READ, PosixFilePermission.OWNER_WRITE));
+        } catch (UnsupportedOperationException ignored) {
+            // The host filesystem does not expose POSIX permissions.
+        } catch (IOException exception) {
+            plugin.getLogger().warning("Could not restrict secrets.yml file permissions: "
+                    + exception.getClass().getSimpleName());
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
