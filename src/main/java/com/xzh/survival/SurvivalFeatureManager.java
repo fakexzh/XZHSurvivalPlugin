@@ -66,8 +66,8 @@ public final class SurvivalFeatureManager implements Listener {
 
     public SurvivalFeatureManager(JavaPlugin plugin) {
         this.plugin = plugin;
-        this.monsterLevelKey = new NamespacedKey(plugin, "monster_level");
-        this.builtStepKey = new NamespacedKey(plugin, "monster_built_step");
+        this.monsterLevelKey = new NamespacedKey("xzhsurvivalplugin", "monster_level");
+        this.builtStepKey = new NamespacedKey("xzhsurvivalplugin", "monster_built_step");
         this.playtimeFile = new File(plugin.getDataFolder(), "playtime.yml");
     }
 
