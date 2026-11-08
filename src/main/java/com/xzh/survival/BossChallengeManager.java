@@ -136,26 +136,26 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
 
     public BossChallengeManager(JavaPlugin plugin) {
         this.plugin = plugin;
-        bossTag = new NamespacedKey(plugin, "boss_challenge_boss");
-        tierTag = new NamespacedKey(plugin, "boss_challenge_tier");
-        nameTag = new NamespacedKey(plugin, "boss_challenge_name");
-        projectileTag = new NamespacedKey(plugin, "boss_challenge_projectile");
-        challengerIdTag = new NamespacedKey(plugin, "boss_challenge_challenger_id");
-        challengerNameTag = new NamespacedKey(plugin, "boss_challenge_challenger_name");
-        entryFeeTag = new NamespacedKey(plugin, "boss_challenge_entry_fee");
-        manualTag = new NamespacedKey(plugin, "boss_challenge_manual");
-        arenaXTag = new NamespacedKey(plugin, "boss_challenge_arena_x");
-        arenaZTag = new NamespacedKey(plugin, "boss_challenge_arena_z");
-        arenaMinYTag = new NamespacedKey(plugin, "boss_challenge_arena_min_y");
-        arenaMaxYTag = new NamespacedKey(plugin, "boss_challenge_arena_max_y");
-        keyTag = new NamespacedKey(plugin, "boss_challenge_reward_key");
-        keyIdTag = new NamespacedKey(plugin, "boss_challenge_key_id");
-        keyTierTag = new NamespacedKey(plugin, "boss_challenge_key_tier");
-        keyNameTag = new NamespacedKey(plugin, "boss_challenge_key_name");
-        keyRewardTag = new NamespacedKey(plugin, "boss_challenge_key_reward");
-        keyAcceptedTag = new NamespacedKey(plugin, "boss_challenge_key_accepted_by");
-        keyDefeatedTag = new NamespacedKey(plugin, "boss_challenge_key_defeated_by");
-        keyEntryFeeTag = new NamespacedKey(plugin, "boss_challenge_key_entry_fee");
+        bossTag = new NamespacedKey("xzhsurvivalplugin", "boss_challenge_boss");
+        tierTag = new NamespacedKey("xzhsurvivalplugin", "boss_challenge_tier");
+        nameTag = new NamespacedKey("xzhsurvivalplugin", "boss_challenge_name");
+        projectileTag = new NamespacedKey("xzhsurvivalplugin", "boss_challenge_projectile");
+        challengerIdTag = new NamespacedKey("xzhsurvivalplugin", "boss_challenge_challenger_id");
+        challengerNameTag = new NamespacedKey("xzhsurvivalplugin", "boss_challenge_challenger_name");
+        entryFeeTag = new NamespacedKey("xzhsurvivalplugin", "boss_challenge_entry_fee");
+        manualTag = new NamespacedKey("xzhsurvivalplugin", "boss_challenge_manual");
+        arenaXTag = new NamespacedKey("xzhsurvivalplugin", "boss_challenge_arena_x");
+        arenaZTag = new NamespacedKey("xzhsurvivalplugin", "boss_challenge_arena_z");
+        arenaMinYTag = new NamespacedKey("xzhsurvivalplugin", "boss_challenge_arena_min_y");
+        arenaMaxYTag = new NamespacedKey("xzhsurvivalplugin", "boss_challenge_arena_max_y");
+        keyTag = new NamespacedKey("xzhsurvivalplugin", "boss_challenge_reward_key");
+        keyIdTag = new NamespacedKey("xzhsurvivalplugin", "boss_challenge_key_id");
+        keyTierTag = new NamespacedKey("xzhsurvivalplugin", "boss_challenge_key_tier");
+        keyNameTag = new NamespacedKey("xzhsurvivalplugin", "boss_challenge_key_name");
+        keyRewardTag = new NamespacedKey("xzhsurvivalplugin", "boss_challenge_key_reward");
+        keyAcceptedTag = new NamespacedKey("xzhsurvivalplugin", "boss_challenge_key_accepted_by");
+        keyDefeatedTag = new NamespacedKey("xzhsurvivalplugin", "boss_challenge_key_defeated_by");
+        keyEntryFeeTag = new NamespacedKey("xzhsurvivalplugin", "boss_challenge_key_entry_fee");
 
         Bukkit.getPluginManager().registerEvents(this, plugin);
         if (plugin.getCommand("boss") != null) {
@@ -189,7 +189,7 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
             }
         }
 
-        NamespacedKey legacyBossTag = new NamespacedKey(plugin, "roaming_boss");
+        NamespacedKey legacyBossTag = new NamespacedKey("xzhsurvivalplugin", "roaming_boss");
         for (World world : Bukkit.getWorlds()) {
             for (Entity entity : world.getEntities()) {
                 if (!(entity instanceof LivingEntity living)) continue;
@@ -1011,7 +1011,7 @@ public final class BossChallengeManager implements Listener, CommandExecutor, Ta
 
     @EventHandler
     public void onChunkLoad(ChunkLoadEvent event) {
-        NamespacedKey legacyBossTag = new NamespacedKey(plugin, "roaming_boss");
+        NamespacedKey legacyBossTag = new NamespacedKey("xzhsurvivalplugin", "roaming_boss");
         for (Entity entity : event.getChunk().getEntities()) {
             if (!(entity instanceof LivingEntity living)) continue;
             if (living.getPersistentDataContainer().has(legacyBossTag, PersistentDataType.BYTE)) {
