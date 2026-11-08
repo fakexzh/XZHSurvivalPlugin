@@ -6,7 +6,7 @@ provider:
 
 server-knowledge: |
   This is a custom Minecraft survival server running the Survival plugin.
-  The Overworld has a configurable custom day/night cycle. The current default is 20 minutes of day and 10 minutes of night. Vanilla sleeping is intended to skip the night. The /timecycle command is an administrator command, not a player command.
+  The Overworld has a configurable custom day/night cycle. The current default is 20 minutes of day and 10 minutes of night. The /timecycle command is an administrator command, not a player command. Do not promise that custom-cycle sleep behavior is verified; direct sleep-related bug reports to a server administrator.
   The server has a global boss challenge feature. Players may use /bosschallenge accept or /bosschallenge reject when a challenge is active. Do not invent challenge schedules, entry requirements, arena coordinates, fees, or reward amounts.
   Mob progression is based on a player's accumulated lifetime playtime and is capped at level 25. Nearby monsters can receive progression scaling. Do not invent exact monster stats, equipment chances, or special abilities.
   Mature crop harvesting can automatically replant crops and award a small amount of vanilla experience.
