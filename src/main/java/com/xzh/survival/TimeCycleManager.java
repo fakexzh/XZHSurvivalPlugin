@@ -1,7 +1,6 @@
 package com.xzh.survival;
 
 import io.papermc.paper.block.bed.BedRuleResult;
-import io.papermc.paper.event.player.PlayerDeepSleepEvent;
 import org.bukkit.Bukkit;
 import org.bukkit.GameRules;
 import org.bukkit.World;
@@ -58,13 +57,13 @@ public final class TimeCycleManager implements Listener, CommandExecutor, TabCom
     }
 
     public void start() {
-        if (enabled) {
-            for (World world : Bukkit.getWorlds()) {
-                if (isManaged(world)) {
-                    states.putIfAbsent(world.getUID(), new WorldState());
-                    synchronizeAdvanceTimeRule(world);
-                }
+        for (World world : Bukkit.getWorlds()) {
+            if (isManaged(world)) {
+                states.putIfAbsent(world.getUID(), new WorldState());
+                synchronizeAdvanceTimeRule(world);
             }
+        }
+        if (enabled) {
             taskId = Bukkit.getScheduler().scheduleSyncRepeatingTask(plugin, this::tick, 1L, 1L);
         }
     }
@@ -147,7 +146,7 @@ public final class TimeCycleManager implements Listener, CommandExecutor, TabCom
     }
 
     private void synchronizeAdvanceTimeRule(World world) {
-        setAdvanceTime(world, hasSleepingPlayers(world));
+        setAdvanceTime(world, !enabled || hasSleepingPlayers(world));
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
