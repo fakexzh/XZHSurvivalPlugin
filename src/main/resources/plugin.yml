@@ -19,10 +19,17 @@ commands:
   timecycle:
     description: Manage independent day and night durations
     usage: /timecycle <status|day|night|setday|setnight|pause|resume|reload|reset>
+  survivalnpc:
+    description: Manage the Gemini Survival Guide NPC
+    usage: /survivalnpc <create|remove|status|reload>
+    permission: survival.ai.admin
 
 permissions:
   survival.timecycle.admin:
     description: Allows managing the custom day and night cycle
+    default: op
+  survival.ai.admin:
+    description: Allows managing the Gemini Survival Guide NPC
     default: op
   xzhsurvival.boss.admin:
     description: Allows manually spawning boss encounters
