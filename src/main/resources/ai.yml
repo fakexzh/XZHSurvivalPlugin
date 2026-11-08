@@ -3,7 +3,17 @@ provider:
   model: gemini-3.6-flash
   api-key-env: GEMINI_API_KEY
   request-timeout-seconds: 15
-server-knowledge: ""
+
+server-knowledge: |
+  This is a custom Minecraft survival server running the Survival plugin.
+  The Overworld has a configurable custom day/night cycle. The current default is 20 minutes of day and 10 minutes of night. Vanilla sleeping is intended to skip the night. The /timecycle command is an administrator command, not a player command.
+  The server has a global boss challenge feature. Players may use /bosschallenge accept or /bosschallenge reject when a challenge is active. Do not invent challenge schedules, entry requirements, arena coordinates, fees, or reward amounts.
+  Mob progression is based on a player's accumulated lifetime playtime and is capped at level 25. Nearby monsters can receive progression scaling. Do not invent exact monster stats, equipment chances, or special abilities.
+  Mature crop harvesting can automatically replant crops and award a small amount of vanilla experience.
+  The death system has different inventory rules by dimension: Overworld deaths normally drop inventory, while Nether and End deaths keep inventory. Deaths remove between 25% and 50% of experience. Bank penalties may also apply; do not invent a penalty amount.
+  The plugin includes additional loot features involving mobs, fishing, village chests, and piglin bartering. Do not invent drop rates or guaranteed rewards.
+  Villager and wandering-trader offers use dynamic trading rules, with a default 30-minute refresh interval. Do not invent item prices or guarantee a specific offer.
+  This knowledge file does not contain the economy shop catalogue, quest catalogue, or the custom-fish database. If asked about their prices, quest requirements, fish locations, or catch conditions, say that you do not have verified information and direct the player to the relevant in-game menu or a server administrator.
 
 npc:
   enabled: true
