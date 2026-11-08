@@ -26,7 +26,7 @@ jobs:
       - name: Verify villager dialogue was removed
         run: |
           test -f build/libs/SurvivalPlugin-1.0.0.jar
-          if jar tf build/libs/XZHSurvivalPlugin-1.0.0.jar | grep -Eq 'VillagerBubbleStoryManager.class|villager-dialogue.yml'; then
+          if jar tf build/libs/SurvivalPlugin-1.0.0.jar | grep -Eq 'VillagerBubbleStoryManager.class|villager-dialogue.yml'; then
             echo "Villager story dialogue still exists in the JAR"
             exit 1
           fi
@@ -39,6 +39,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: SurvivalPlugin-1.0.0
-          path: build/libs/XZHSurvivalPlugin-1.0.0.jar
+          path: build/libs/SurvivalPlugin-1.0.0.jar
           if-no-files-found: error
           retention-days: 90
