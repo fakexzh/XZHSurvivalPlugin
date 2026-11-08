@@ -16,6 +16,10 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.io.IOException;
+import java.util.stream.Stream;
 
 public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
     private final Random random = new Random();
@@ -28,6 +32,7 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
 
     @Override
     public void onEnable() {
+        migrateLegacyDataFolder();
         saveDefaultConfig();
         getServer().getPluginManager().registerEvents(this, this);
         getServer().getPluginManager().registerEvents(new VillagerWorkstationResetListener(this), this);
@@ -46,6 +51,29 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         bossChallengeManager = new BossChallengeManager(this);
         bossChallengeManager.start();
         getLogger().info("Survival plugin enabled.");
+    }
+
+    private void migrateLegacyDataFolder() {
+        File target = getDataFolder();
+        File legacy = new File(target.getParentFile(), "XZHSurvivalPlugin");
+        if (!legacy.isDirectory() || legacy.equals(target)) return;
+        try {
+            Files.createDirectories(target.toPath());
+            try (Stream<Path> paths = Files.walk(legacy.toPath())) {
+                for (Path source : paths.toList()) {
+                    Path destination = target.toPath().resolve(legacy.toPath().relativize(source));
+                    if (Files.isDirectory(source)) {
+                        Files.createDirectories(destination);
+                    } else if (!Files.exists(destination)) {
+                        Files.createDirectories(destination.getParent());
+                        Files.copy(source, destination);
+                    }
+                }
+            }
+            getLogger().info("Migrated existing survival data.");
+        } catch (IOException exception) {
+            throw new IllegalStateException("Could not migrate existing survival data; startup aborted to protect saved data.", exception);
+        }
     }
 
     @Override
