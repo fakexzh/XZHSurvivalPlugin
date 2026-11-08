@@ -19,6 +19,7 @@ import java.util.UUID;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.io.IOException;
+import java.io.File;
 import java.util.stream.Stream;
 
 public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
