@@ -52,6 +52,10 @@ public final class KnockdownManager implements Listener {
         return player != null && downed.containsKey(player.getUniqueId());
     }
 
+    public boolean isReviving(Player player) {
+        return player != null && revivesByReviver.containsKey(player.getUniqueId());
+    }
+
     public void start() {
         Bukkit.getPluginManager().registerEvents(this, plugin);
         ticker = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, 1L, 1L);
