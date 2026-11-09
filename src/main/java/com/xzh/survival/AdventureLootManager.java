@@ -49,7 +49,27 @@ public final class AdventureLootManager implements Listener {
     }
 
     public void start() {
+        migrateMobCoinChances();
         Bukkit.getPluginManager().registerEvents(this, plugin);
+    }
+
+    private void migrateMobCoinChances() {
+        boolean changed = false;
+        String hundredPath = "adventure-loot.mob-loot.coin-100-chance";
+        String thousandPath = "adventure-loot.mob-loot.coin-1000-chance";
+        // Upgrade the old bundled defaults for existing servers without overwriting
+        // any custom values an administrator has already chosen.
+        if (!plugin.getConfig().contains(hundredPath)
+                || Double.compare(plugin.getConfig().getDouble(hundredPath), 0.001) == 0) {
+            plugin.getConfig().set(hundredPath, 0.900);
+            changed = true;
+        }
+        if (!plugin.getConfig().contains(thousandPath)
+                || Double.compare(plugin.getConfig().getDouble(thousandPath), 0.0001) == 0) {
+            plugin.getConfig().set(thousandPath, 0.500);
+            changed = true;
+        }
+        if (changed) plugin.saveConfig();
     }
 
     @EventHandler(ignoreCancelled = true)
