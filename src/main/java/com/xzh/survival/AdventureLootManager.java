@@ -72,10 +72,19 @@ public final class AdventureLootManager implements Listener {
                     Material.IRON_BLOCK, Material.OBSIDIAN, Material.EXPERIENCE_BOTTLE};
             event.getDrops().add(new ItemStack(rareLoot[random.nextInt(rareLoot.length)], 1));
         }
-        double coinChance = Math.min(0.08, plugin.getConfig().getDouble("adventure-loot.mob-loot.coin-drop-chance", 0.08) + (mobLevel - 1) * 0.0002);
-        if (random.nextDouble() < coinChance) {
-            ItemStack coin = rollCoinReward("adventure-loot.mob-loot", mobLevel >= 80 ? 1000 : mobLevel >= 50 ? 100 : mobLevel >= 20 ? 10 : 1);
-            if (coin != null) event.getDrops().add(coin);
+        // Roll each requested denomination independently. Vanilla drops stay untouched;
+        // both coin stacks may be added to the same mob's normal drop list.
+        double hundredChance = clampChance(plugin.getConfig().getDouble(
+                "adventure-loot.mob-loot.coin-100-chance", 0.900));
+        double thousandChance = clampChance(plugin.getConfig().getDouble(
+                "adventure-loot.mob-loot.coin-1000-chance", 0.500));
+        if (random.nextDouble() < hundredChance) {
+            ItemStack coins = createOfficialCoin(100, 1);
+            if (coins != null) event.getDrops().add(coins);
+        }
+        if (random.nextDouble() < thousandChance) {
+            ItemStack coins = createOfficialCoin(1000, 1);
+            if (coins != null) event.getDrops().add(coins);
         }
         double extremeChance = Math.min(0.0002, plugin.getConfig().getDouble("adventure-loot.mob-loot.extreme-rare-chance", 0.0002) + (mobLevel - 1) * 0.000001);
         if (random.nextDouble() < extremeChance) {
@@ -269,6 +278,11 @@ public final class AdventureLootManager implements Listener {
             item.setItemMeta(book);
         }
         return item;
+    }
+
+    private double clampChance(double chance) {
+        if (!Double.isFinite(chance)) return 0.0;
+        return Math.max(0.0, Math.min(1.0, chance));
     }
 
     private ItemStack rollCoinReward(String path) {
