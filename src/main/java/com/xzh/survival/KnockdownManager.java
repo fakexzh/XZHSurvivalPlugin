@@ -85,19 +85,33 @@ public final class KnockdownManager implements Listener {
         player.setHealth(1.0);
         player.setInvulnerable(true);
         player.setSprinting(false);
-        // GSit's API controls the crawl state and broadcasts the correct pose to observers.
-        state.gsitCrawl = GsitCrawlSupport.start(player, plugin);
-        player.setWalkSpeed(clampWalkSpeed(plugin.getConfig().getDouble("knockdown.crawl-speed", 0.06)));
-
+        // Create the HUD first. A failure in the optional GSit integration must never
+        // prevent the downed state, countdown, or revive prompt from appearing.
+        try {
+            state.downBar = Bukkit.createBossBar("§c§lDOWNED §8• §f01:00", BarColor.RED, BarStyle.SEGMENTED_10);
+            state.downBar.setProgress(1.0);
+            state.downBar.addPlayer(player);
+            state.downBar.setVisible(true);
+        } catch (RuntimeException ex) {
+            plugin.getLogger().warning("Could not create downed bossbar: " + ex.getClass().getSimpleName());
+        }
         try {
             state.countdownIndicator = spawnIndicator(player, 1.43, "§f01:00", 0.62f, true);
             state.indicator = spawnIndicator(player, 1.15, "§c§lDOWNED", 0.82f, true);
             state.revivePrompt = spawnIndicator(player, 0.76,
                     "§eRevive: §fHold SHIFT nearby", 0.44f, false);
         } catch (RuntimeException ex) {
-            plugin.getLogger().warning("Could not create downed-player indicator: " + ex.getClass().getSimpleName());
+            plugin.getLogger().warning("Could not create downed-player text displays: " + ex.getClass().getSimpleName());
         }
+        try {
+            state.gsitCrawl = GsitCrawlSupport.start(player, plugin);
+        } catch (RuntimeException ex) {
+            plugin.getLogger().warning("GSit crawl start failed safely: " + ex.getClass().getSimpleName());
+            player.setSwimming(true);
+        }
+        player.setWalkSpeed(clampWalkSpeed(plugin.getConfig().getDouble("knockdown.crawl-speed", 0.06)));
         player.sendTitle("§c§lYOU ARE DOWNED", "§7Crawl to safety. Someone can revive you.", 5, 45, 10);
+        player.sendActionBar("§c§lDOWNED §8• §fA teammate can hold SHIFT nearby to revive you");
     }
 
 
@@ -225,8 +239,19 @@ public final class KnockdownManager implements Listener {
             long remaining = state.durationTicks - elapsed;
             if (remaining <= 0) { finishAsDeath(player); continue; }
             if (ticks % 20 == 0) applyProgressiveEffects(player, elapsed / 20);
-            if (state.gsitCrawl != null && ticks % 5 == 0) {
-                state.gsitCrawl = GsitCrawlSupport.ensure(player, state.gsitCrawl, plugin);
+            if (ticks % 10 == 0) {
+                long seconds = Math.max(0, (remaining + 19) / 20);
+                player.sendActionBar("§c§lDOWNED §8• §f" + String.format(Locale.ROOT, "%02d:%02d", seconds / 60, seconds % 60)
+                        + " §8• §eHold SHIFT near a teammate to revive");
+            }
+            if (state.downBar != null && ticks % 2 == 0) updateDownedBar(state, remaining);
+            if (ticks % 5 == 0) {
+                try {
+                    state.gsitCrawl = GsitCrawlSupport.ensure(player, state.gsitCrawl, plugin);
+                } catch (RuntimeException ex) {
+                    plugin.getLogger().warning("GSit crawl maintenance failed safely: " + ex.getClass().getSimpleName());
+                    player.setSwimming(true);
+                }
             }
             if (state.indicator != null && state.indicator.isValid() && ticks % 2 == 0) {
                 state.indicator.teleport(player.getLocation().add(0, 1.15, 0));
@@ -268,6 +293,14 @@ public final class KnockdownManager implements Listener {
         }
         if (elapsedSeconds >= darknessStart)
             player.addPotionEffect(new PotionEffect(PotionEffectType.DARKNESS, 45, 0, true, false, false));
+    }
+
+    private void updateDownedBar(DownedState state, long remainingTicks) {
+        if (state.downBar == null) return;
+        long seconds = Math.max(0, (remainingTicks + 19) / 20);
+        state.downBar.setTitle((state.reviverId == null ? "§c§lDOWNED" : "§a§lREVIVING")
+                + " §8• §f" + String.format(Locale.ROOT, "%02d:%02d", seconds / 60, seconds % 60));
+        state.downBar.setProgress(Math.max(0.0, Math.min(1.0, (double) remainingTicks / state.durationTicks)));
     }
 
     private void updateReviveBar(ReviveSession session) {
@@ -336,9 +369,20 @@ public final class KnockdownManager implements Listener {
             for (Player viewer : Bukkit.getOnlinePlayers()) viewer.hideEntity(plugin, state.revivePrompt);
             state.revivePrompt.remove();
         }
-        GsitCrawlSupport.stop(player, state.gsitCrawl, plugin);
+        try {
+            GsitCrawlSupport.stop(player, state.gsitCrawl, plugin);
+        } catch (RuntimeException ex) {
+            plugin.getLogger().warning("GSit crawl cleanup failed safely: " + ex.getClass().getSimpleName());
+        }
+        if (state.downBar != null) {
+            state.downBar.removeAll();
+            state.downBar.setVisible(false);
+        }
         if (player != null) {
             player.setInvulnerable(state.previousInvulnerable);
+            // Clear Bukkit's post-damage immunity so the revived player can be hit immediately.
+            player.setNoDamageTicks(0);
+            player.setMaximumNoDamageTicks(Math.max(1, player.getMaximumNoDamageTicks()));
             player.setWalkSpeed(state.previousWalkSpeed);
             if (state.previousFixedPose) player.setPose(state.previousPose, true);
             else player.unsetFixedPose();
@@ -394,6 +438,7 @@ public final class KnockdownManager implements Listener {
         private final Pose previousPose;
         private final PotionEffect previousNausea, previousDarkness;
         private TextDisplay indicator, countdownIndicator, revivePrompt;
+        private BossBar downBar;
         private Object gsitCrawl;
         private UUID reviverId;
         private DownedState(Player player, long startedAt, long durationTicks) {
