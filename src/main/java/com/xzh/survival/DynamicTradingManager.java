@@ -86,7 +86,6 @@ public final class DynamicTradingManager implements Listener {
             List<MerchantRecipe> recipes = new ArrayList<>(base);
             recipes.addAll(makeSpecialOffers(entity instanceof WanderingTrader));
             merchant.setRecipes(recipes);
-            event.getPlayer().sendMessage("§d[Trader] §7Special offers refreshed. Each special offer can be used once this cycle.");
         } else {
             // Keep the current cycle's use counts; never recreate offers just because a player reopens the menu.
             List<MerchantRecipe> current = merchant.getRecipes();
