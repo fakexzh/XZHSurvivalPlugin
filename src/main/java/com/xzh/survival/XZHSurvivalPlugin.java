@@ -70,10 +70,10 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
 
     private void migrateRobberyAndCoinLootConfig() {
         boolean changed = false;
-        if (!getConfig().getBoolean("migrations.robbery-coin-loot-20261109", false)) {
-            getConfig().set("adventure-loot.mob-loot.coin-100-chance", 0.10);
+        if (!getConfig().getBoolean("migrations.mob-fishing-coin-rates-20261109-v2", false)) {
+            getConfig().set("adventure-loot.mob-loot.coin-100-chance", 0.05);
             getConfig().set("adventure-loot.mob-loot.coin-1000-chance", 0.01);
-            getConfig().set("adventure-loot.fishing.coin-100-chance", 0.10);
+            getConfig().set("adventure-loot.fishing.coin-100-chance", 0.05);
             getConfig().set("adventure-loot.fishing.coin-1000-chance", 0.01);
             getConfig().set("migrations.robbery-coin-loot-20261109", true);
             changed = true;
