@@ -1,5 +1,6 @@
 plugins {
     java
+    id("io.papermc.paperweight.userdev") version "2.0.0-beta.23"
 }
 
 group = "com.xzh"
@@ -11,7 +12,13 @@ repositories {
 }
 
 dependencies {
-    compileOnly("io.papermc.paper:paper-api:26.3.build.195-stable")
+    paperweight.paperDevBundle("26.3.build.195-stable")
+}
+
+paperweight.reobfArtifactConfiguration = io.papermc.paperweight.userdev.ReobfArtifactConfiguration.MOJANG_PRODUCTION
+
+tasks.assemble {
+    dependsOn(tasks.reobfJar)
 }
 
 java {
