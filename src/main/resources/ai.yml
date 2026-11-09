@@ -25,5 +25,5 @@ limits:
   player-cooldown-seconds: 5
   max-concurrent-requests: 3
   max-question-characters: 400
-  max-response-characters: 350
-  max-output-tokens: 220
+  max-response-characters: 1000
+  max-output-tokens: 512
