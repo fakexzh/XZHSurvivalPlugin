@@ -235,7 +235,7 @@ public final class KnockdownManager implements Listener {
                 cancelRevive(session, null, false); continue;
             }
             if (!reviver.isSneaking()) { cancelRevive(session, "You released SHIFT.", true); continue; }
-            double range = Math.max(1.0, plugin.getConfig().getDouble("knockdown.revive.range-blocks", 3.0));
+            double range = Math.max(1.0, plugin.getConfig().getDouble("knockdown.revive.range-blocks", 2.0));
             if (!reviver.getWorld().equals(target.getWorld())
                     || reviver.getLocation().distanceSquared(target.getLocation()) > range * range) {
                 cancelRevive(session, "You moved too far away.", true); continue;
