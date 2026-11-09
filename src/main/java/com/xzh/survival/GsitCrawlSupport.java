@@ -32,6 +32,26 @@ final class GsitCrawlSupport {
         return null;
     }
 
+    static Object ensure(Player player, Object currentCrawl, JavaPlugin owner) {
+        Plugin gsit = Bukkit.getPluginManager().getPlugin("GSit");
+        if (gsit == null || !gsit.isEnabled()) return currentCrawl;
+        try {
+            ClassLoader loader = gsit.getClass().getClassLoader();
+            Class<?> api = loader.loadClass("dev.geco.gsit.api.GSitAPI");
+            Method isCrawling = api.getMethod("isPlayerCrawling", Player.class);
+            if (Boolean.TRUE.equals(isCrawling.invoke(null, player))) return currentCrawl;
+            Class<?> crawlType = loader.loadClass("dev.geco.gsit.model.CrawlType");
+            @SuppressWarnings({"unchecked", "rawtypes"})
+            Object commandType = Enum.valueOf((Class<? extends Enum>) crawlType.asSubclass(Enum.class), "COMMAND");
+            Method start = api.getMethod("startCrawl", Player.class, crawlType);
+            Object restarted = start.invoke(null, player, commandType);
+            if (restarted != null) return restarted;
+        } catch (ReflectiveOperationException | LinkageError ex) {
+            owner.getLogger().warning("Could not maintain GSit knockdown crawl: " + ex.getClass().getSimpleName());
+        }
+        return currentCrawl;
+    }
+
     static void stop(Player player, Object crawl, JavaPlugin owner) {
         if (crawl != null) {
             Plugin gsit = Bukkit.getPluginManager().getPlugin("GSit");
