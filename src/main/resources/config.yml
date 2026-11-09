@@ -61,7 +61,7 @@ mob-progression:
 
 adventure-loot:
   enabled: true
-  # Mob-kill rolls remain 10% for 100 coins and 1% for 1,000; fishing uses 5% and 1%. Vanilla drops are unchanged.
+  # Mob-kill rolls remain 10% for 100 coins and 1% for 1,000. Fishing never generates coins; vanilla catches are unchanged.
   mob-loot:
     enabled: true
     first-pickup-announcements: true
@@ -69,8 +69,8 @@ adventure-loot:
     coin-1000-chance: 0.01
   fishing:
     enabled: true
-    coin-100-chance: 0.05
-    coin-1000-chance: 0.01
+    coin-100-chance: 0.0
+    coin-1000-chance: 0.0
     quest-enabled: true
     quest-catches: 10
   exploration:
