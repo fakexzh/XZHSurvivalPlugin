@@ -61,7 +61,7 @@ mob-progression:
 
 adventure-loot:
   enabled: true
-  # Independent mob-kill and fishing rolls: 5% for a 100-coin item and 1% for a 1,000-coin item.
+  # Independent mob-kill and fishing rolls: 5% for 100 coins and 1% for 1,000 coins; vanilla drops are unchanged.
   mob-loot:
     enabled: true
     first-pickup-announcements: true
