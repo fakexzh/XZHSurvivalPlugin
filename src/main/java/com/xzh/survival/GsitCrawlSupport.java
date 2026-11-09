@@ -42,7 +42,8 @@ final class GsitCrawlSupport {
                     Class<?> stopReason = loader.loadClass("dev.geco.gsit.model.StopReason");
                     @SuppressWarnings({"unchecked", "rawtypes"})
                     Object pluginReason = Enum.valueOf((Class<? extends Enum>) stopReason.asSubclass(Enum.class), "PLUGIN");
-                    Method stop = api.getMethod("stopCrawl", crawl.getClass(), stopReason);
+                    Class<?> crawlClass = loader.loadClass("dev.geco.gsit.model.Crawl");
+                    Method stop = api.getMethod("stopCrawl", crawlClass, stopReason);
                     stop.invoke(null, crawl, pluginReason);
                     return;
                 } catch (ReflectiveOperationException | LinkageError ex) {
