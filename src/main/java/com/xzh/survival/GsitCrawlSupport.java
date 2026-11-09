@@ -24,7 +24,7 @@ final class GsitCrawlSupport {
                 Object crawl = start.invoke(null, player, commandType);
                 if (crawl != null) return crawl;
                 owner.getLogger().warning("GSit declined the knockdown crawl request; using vanilla crawl state.");
-            } catch (ReflectiveOperationException | LinkageError ex) {
+            } catch (ReflectiveOperationException | LinkageError | RuntimeException ex) {
                 owner.getLogger().warning("GSit crawl API integration failed; using vanilla crawl state: " + ex.getClass().getSimpleName());
             }
         }
