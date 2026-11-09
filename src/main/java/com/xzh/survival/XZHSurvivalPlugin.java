@@ -31,6 +31,7 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
     private FarmingManager farmingManager;
     private BossChallengeManager bossChallengeManager;
     private TimeCycleManager timeCycleManager;
+    private KnockdownManager knockdownManager;
 
     @Override
     public void onEnable() {
@@ -50,6 +51,8 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         bossChallengeManager.start();
         timeCycleManager = new TimeCycleManager(this);
         timeCycleManager.start();
+        knockdownManager = new KnockdownManager(this);
+        knockdownManager.start();
         getLogger().info("Survival plugin enabled.");
     }
 
@@ -81,6 +84,7 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         if (survivalFeatureManager != null) survivalFeatureManager.shutdown();
         if (bossChallengeManager != null) bossChallengeManager.shutdown();
         if (timeCycleManager != null) timeCycleManager.shutdown();
+        if (knockdownManager != null) knockdownManager.shutdown();
     }
 
     @EventHandler

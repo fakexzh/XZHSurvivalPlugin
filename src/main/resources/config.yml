@@ -6,6 +6,19 @@ custom-time:
   # Empty means every loaded Overworld. Otherwise list exact world folder names.
   worlds: []
 
+# Knockdown and player revival. All status/progress feedback is HUD-only (no chat messages).
+knockdown:
+  enabled: true
+  duration-seconds: 60
+  crawl-speed: 0.06
+  revive:
+    duration-seconds: 5
+    range-blocks: 3.0
+    health: 2.0
+  effects:
+    nausea-start-seconds: 8
+    darkness-start-seconds: 20
+
 # Replant mature crops from their harvest drops and award small vanilla XP orbs.
 farming:
   enabled: true

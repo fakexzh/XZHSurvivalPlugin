@@ -3,7 +3,7 @@ version: 1.0.0
 main: com.xzh.survival.XZHSurvivalPlugin
 api-version: '26.3'
 softdepend: [XZHEconomySystem]
-description: Survival gameplay features and dimension death rules
+description: Survival gameplay features, knockdown and dimension death rules
 
 commands:
   boss:
