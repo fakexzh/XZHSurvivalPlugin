@@ -17,9 +17,6 @@ dependencies {
 
 paperweight.reobfArtifactConfiguration = io.papermc.paperweight.userdev.ReobfArtifactConfiguration.MOJANG_PRODUCTION
 
-tasks.assemble {
-    dependsOn(tasks.reobfJar)
-}
 
 java {
     toolchain.languageVersion.set(JavaLanguageVersion.of(25))
