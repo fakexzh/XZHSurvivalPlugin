@@ -9,6 +9,9 @@ import org.bukkit.boss.BossBar;
 import org.bukkit.entity.Display;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Pose;
+import org.bukkit.util.Transformation;
+import org.joml.Vector3f;
+import org.joml.Quaternionf;
 import org.bukkit.entity.TextDisplay;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -18,7 +21,6 @@ import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
-import org.bukkit.event.entity.EntityToggleSwimEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
@@ -85,31 +87,19 @@ public final class KnockdownManager implements Listener {
         player.setHealth(1.0);
         player.setInvulnerable(true);
         player.setSprinting(false);
-        // GSit-style crawling: the player's swim state is paired with client-only
-        // collision entities so the local client enters the crawl pose naturally.
-        state.crawlVisual = new DownedCrawlVisual(player);
-        state.crawlVisual.start();
+        // GSit's API controls the crawl state and broadcasts the correct pose to observers.
+        state.gsitCrawl = GsitCrawlSupport.start(player, plugin);
         player.setWalkSpeed(clampWalkSpeed(plugin.getConfig().getDouble("knockdown.crawl-speed", 0.06)));
-        state.deathBar = Bukkit.createBossBar("", BarColor.RED, BarStyle.SOLID);
-        state.deathBar.addPlayer(player);
-        state.deathBar.setVisible(true);
 
         try {
-            state.indicator = player.getWorld().spawn(player.getLocation().add(0, 1.25, 0), TextDisplay.class, display -> {
-                display.setText("§c§lDOWNED");
-                display.setBillboard(Display.Billboard.CENTER);
-                display.setSeeThrough(true);
-                display.setShadowed(true);
-                display.setDefaultBackground(false);
-                display.setPersistent(false);
-                display.setInvulnerable(true);
-                display.setGravity(false);
-            });
+            state.indicator = spawnIndicator(player, 1.25, "§c§lDOWNED", 1.0f, true);
+            state.countdownIndicator = spawnIndicator(player, 1.00, "§f01:00", 0.68f, true);
+            state.revivePrompt = spawnIndicator(player, 0.76,
+                    "§eRevive: §fHold SHIFT + Right-click", 0.55f, false);
         } catch (RuntimeException ex) {
             plugin.getLogger().warning("Could not create downed-player indicator: " + ex.getClass().getSimpleName());
         }
         player.sendTitle("§c§lYOU ARE DOWNED", "§7Crawl to safety. Someone can revive you.", 5, 45, 10);
-        updateDeathBar(state);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -124,7 +114,7 @@ public final class KnockdownManager implements Listener {
         if (reviver.getUniqueId().equals(target.getUniqueId())
                 || revivesByReviver.containsKey(reviver.getUniqueId())
                 || revivesByTarget.containsKey(target.getUniqueId())) return;
-        double range = Math.max(1.0, plugin.getConfig().getDouble("knockdown.revive.range-blocks", 3.0));
+        double range = Math.max(1.0, plugin.getConfig().getDouble("knockdown.revive.range-blocks", 2.0));
         if (!reviver.getWorld().equals(target.getWorld())
                 || reviver.getLocation().distanceSquared(target.getLocation()) > range * range) return;
         startRevive(reviver, target, state);
@@ -137,6 +127,7 @@ public final class KnockdownManager implements Listener {
         revivesByTarget.put(target.getUniqueId(), session);
         state.reviverId = reviver.getUniqueId();
         if (state.indicator != null && state.indicator.isValid()) state.indicator.setText("§a§lREVIVING");
+        if (state.revivePrompt != null && state.revivePrompt.isValid()) state.revivePrompt.setText("§aREVIVING...");
         session.bar = Bukkit.createBossBar("", BarColor.GREEN, BarStyle.SOLID);
         session.bar.addPlayer(reviver);
         session.bar.setVisible(true);
@@ -190,25 +181,6 @@ public final class KnockdownManager implements Listener {
     @EventHandler(ignoreCancelled = true)
     public void onDownedSwap(PlayerSwapHandItemsEvent e) { if (downed.containsKey(e.getPlayer().getUniqueId())) e.setCancelled(true); }
 
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
-    public void onDownedSwimToggle(EntityToggleSwimEvent event) {
-        if (event.getEntity() instanceof Player player && downed.containsKey(player.getUniqueId())) {
-            event.setCancelled(true);
-        }
-    }
-
-    @EventHandler(ignoreCancelled = true)
-    public void onDownedMovement(PlayerMoveEvent event) {
-        DownedState state = downed.get(event.getPlayer().getUniqueId());
-        if (state != null && state.crawlVisual != null && event.getTo() != null) {
-            Location from = event.getFrom();
-            Location to = event.getTo();
-            if (from.getX() != to.getX() || from.getY() != to.getY() || from.getZ() != to.getZ()) {
-                state.crawlVisual.update(to);
-            }
-        }
-    }
-
     @EventHandler(ignoreCancelled = true)
     public void onDownedJump(PlayerMoveEvent event) {
         if (!downed.containsKey(event.getPlayer().getUniqueId()) || event.getTo() == null) return;
@@ -242,12 +214,19 @@ public final class KnockdownManager implements Listener {
             long elapsed = ticks - state.startedAt;
             long remaining = state.durationTicks - elapsed;
             if (remaining <= 0) { finishAsDeath(player); continue; }
-            if (ticks % 10 == 0 && state.crawlVisual != null) state.crawlVisual.update(player.getLocation());
             if (ticks % 20 == 0) applyProgressiveEffects(player, elapsed / 20);
-            if (ticks % 5 == 0) updateDeathBar(state);
             if (state.indicator != null && state.indicator.isValid() && ticks % 2 == 0) {
                 state.indicator.teleport(player.getLocation().add(0, 1.25, 0));
                 state.indicator.setText(state.reviverId == null ? "§c§lDOWNED" : "§a§lREVIVING");
+            }
+            if (state.countdownIndicator != null && state.countdownIndicator.isValid() && ticks % 2 == 0) {
+                long seconds = Math.max(0, (state.durationTicks - elapsed + 19) / 20);
+                state.countdownIndicator.teleport(player.getLocation().add(0, 1.00, 0));
+                state.countdownIndicator.setText(String.format(Locale.ROOT, "§f%02d:%02d", seconds / 60, seconds % 60));
+            }
+            if (state.revivePrompt != null && state.revivePrompt.isValid() && ticks % 10 == 0) {
+                state.revivePrompt.teleport(player.getLocation().add(0, 0.76, 0));
+                updateRevivePromptVisibility(state, player);
             }
         }
         for (ReviveSession session : new ArrayList<>(revivesByReviver.values())) {
@@ -278,14 +257,6 @@ public final class KnockdownManager implements Listener {
             player.addPotionEffect(new PotionEffect(PotionEffectType.DARKNESS, 45, 0, true, false, false));
     }
 
-    private void updateDeathBar(DownedState state) {
-        if (state.deathBar == null) return;
-        long remaining = Math.max(0, state.durationTicks - (ticks - state.startedAt));
-        long seconds = (remaining + 19) / 20;
-        state.deathBar.setTitle("§cDOWNED §8• §f" + String.format(Locale.ROOT, "%02d:%02d", seconds / 60, seconds % 60));
-        state.deathBar.setProgress(Math.max(0, Math.min(1, (double) remaining / state.durationTicks)));
-    }
-
     private void updateReviveBar(ReviveSession session) {
         if (session.bar == null) return;
         long remaining = Math.max(0, session.durationTicks - (ticks - session.startedAt));
@@ -311,6 +282,7 @@ public final class KnockdownManager implements Listener {
         if (state != null) {
             state.reviverId = null;
             if (state.indicator != null && state.indicator.isValid()) state.indicator.setText("§c§lDOWNED");
+            if (state.revivePrompt != null && state.revivePrompt.isValid()) state.revivePrompt.setText("§eRevive: §fHold SHIFT + Right-click");
         }
         if (!showTitles) return;
         Player reviver = Bukkit.getPlayer(session.reviverId);
@@ -342,9 +314,13 @@ public final class KnockdownManager implements Listener {
         }
         downed.remove(state.playerId);
         Player player = Bukkit.getPlayer(state.playerId);
-        if (state.deathBar != null) { state.deathBar.removeAll(); state.deathBar.setVisible(false); }
         if (state.indicator != null && state.indicator.isValid()) state.indicator.remove();
-        if (state.crawlVisual != null) state.crawlVisual.stop();
+        if (state.countdownIndicator != null && state.countdownIndicator.isValid()) state.countdownIndicator.remove();
+        if (state.revivePrompt != null && state.revivePrompt.isValid()) {
+            for (Player viewer : Bukkit.getOnlinePlayers()) viewer.hideEntity(plugin, state.revivePrompt);
+            state.revivePrompt.remove();
+        }
+        GsitCrawlSupport.stop(player, state.gsitCrawl, plugin);
         if (player != null) {
             player.setInvulnerable(state.previousInvulnerable);
             player.setWalkSpeed(state.previousWalkSpeed);
@@ -358,6 +334,34 @@ public final class KnockdownManager implements Listener {
         }
     }
 
+    private TextDisplay spawnIndicator(Player player, double height, String text, float scale, boolean visibleByDefault) {
+        return player.getWorld().spawn(player.getLocation().add(0, height, 0), TextDisplay.class, display -> {
+            display.setText(text);
+            display.setBillboard(Display.Billboard.CENTER);
+            display.setSeeThrough(true);
+            display.setShadowed(true);
+            display.setDefaultBackground(false);
+            display.setPersistent(false);
+            display.setInvulnerable(true);
+            display.setGravity(false);
+            display.setVisibleByDefault(visibleByDefault);
+            display.setTransformation(new Transformation(
+                    new Vector3f(0, 0, 0), new Quaternionf(),
+                    new Vector3f(scale, scale, scale), new Quaternionf()));
+        });
+    }
+
+    private void updateRevivePromptVisibility(DownedState state, Player target) {
+        if (state.revivePrompt == null || !state.revivePrompt.isValid()) return;
+        for (Player viewer : Bukkit.getOnlinePlayers()) {
+            boolean nearby = viewer != target && !downed.containsKey(viewer.getUniqueId())
+                    && viewer.getWorld().equals(target.getWorld())
+                    && viewer.getLocation().distanceSquared(target.getLocation()) <= 4.0;
+            if (nearby) viewer.showEntity(plugin, state.revivePrompt);
+            else viewer.hideEntity(plugin, state.revivePrompt);
+        }
+    }
+
     private float clampWalkSpeed(double speed) { return (float) Math.max(-1.0, Math.min(1.0, speed)); }
 
     private static final class DownedState {
@@ -367,9 +371,8 @@ public final class KnockdownManager implements Listener {
         private final boolean previousInvulnerable, previousSwimming, previousFixedPose;
         private final Pose previousPose;
         private final PotionEffect previousNausea, previousDarkness;
-        private BossBar deathBar;
-        private TextDisplay indicator;
-        private DownedCrawlVisual crawlVisual;
+        private TextDisplay indicator, countdownIndicator, revivePrompt;
+        private Object gsitCrawl;
         private UUID reviverId;
         private DownedState(Player player, long startedAt, long durationTicks) {
             this.playerId = player.getUniqueId();
