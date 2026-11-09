@@ -71,6 +71,8 @@ adventure-loot:
     coin-10-chance: 0.025
     coin-100-chance: 0.001
     coin-1000-chance: 0.0001
+    mob-coin-100-chance: 0.009
+    mob-coin-1000-chance: 0.001
     multiple-coins-chance: 0.005
   fishing:
     enabled: true
@@ -108,6 +110,7 @@ combat-indicators:
   target-health-enabled: true
   target-range: 6.0
 
+# Mob coin probabilities: 100 coins = 0.9%; 1000 coins = 0.1%.
 # Global boss challenges run on a fixed hourly schedule when enabled.
 # Arena radius: 32 blocks. Nearby players get 10 seconds to enter before the arena locks.
 # Entry fee: 100 bank coins. Rewards: Easy 350-500, Rare 500-1000, Legendary 1500-2500.
