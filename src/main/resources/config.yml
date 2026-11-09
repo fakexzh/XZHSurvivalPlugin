@@ -69,8 +69,8 @@ adventure-loot:
     extreme-rare-chance: 0.0002
     coin-drop-chance: 0.08
     coin-10-chance: 0.025
-    coin-100-chance: 0.001
-    coin-1000-chance: 0.0001
+    coin-100-chance: 0.900
+    coin-1000-chance: 0.500
     multiple-coins-chance: 0.005
   fishing:
     enabled: true
