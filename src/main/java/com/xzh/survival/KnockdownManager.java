@@ -8,7 +8,6 @@ import org.bukkit.boss.BarStyle;
 import org.bukkit.boss.BossBar;
 import org.bukkit.entity.Display;
 import org.bukkit.entity.Player;
-import org.bukkit.entity.Pose;
 import org.bukkit.entity.TextDisplay;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -18,6 +17,7 @@ import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
+import org.bukkit.event.entity.EntityToggleSwimEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
@@ -84,9 +84,10 @@ public final class KnockdownManager implements Listener {
         player.setHealth(1.0);
         player.setInvulnerable(true);
         player.setSprinting(false);
-        // setSwimming() is deprecated and is immediately reverted by Paper.
-        // A fixed SWIMMING pose forces the actual prone crawl animation on Java clients.
-        player.setPose(Pose.SWIMMING, true);
+        // GSit-style crawling: the player's swim state is paired with client-only
+        // collision entities so the local client enters the crawl pose naturally.
+        state.crawlVisual = new DownedCrawlVisual(player);
+        state.crawlVisual.start();
         player.setWalkSpeed(clampWalkSpeed(plugin.getConfig().getDouble("knockdown.crawl-speed", 0.06)));
         state.deathBar = Bukkit.createBossBar("", BarColor.RED, BarStyle.SOLID);
         state.deathBar.addPlayer(player);
@@ -188,6 +189,25 @@ public final class KnockdownManager implements Listener {
     @EventHandler(ignoreCancelled = true)
     public void onDownedSwap(PlayerSwapHandItemsEvent e) { if (downed.containsKey(e.getPlayer().getUniqueId())) e.setCancelled(true); }
 
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onDownedSwimToggle(EntityToggleSwimEvent event) {
+        if (event.getEntity() instanceof Player player && downed.containsKey(player.getUniqueId())) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onDownedMovement(PlayerMoveEvent event) {
+        DownedState state = downed.get(event.getPlayer().getUniqueId());
+        if (state != null && state.crawlVisual != null && event.getTo() != null) {
+            Location from = event.getFrom();
+            Location to = event.getTo();
+            if (from.getX() != to.getX() || from.getY() != to.getY() || from.getZ() != to.getZ()) {
+                state.crawlVisual.update(to);
+            }
+        }
+    }
+
     @EventHandler(ignoreCancelled = true)
     public void onDownedJump(PlayerMoveEvent event) {
         if (!downed.containsKey(event.getPlayer().getUniqueId()) || event.getTo() == null) return;
@@ -221,7 +241,7 @@ public final class KnockdownManager implements Listener {
             long elapsed = ticks - state.startedAt;
             long remaining = state.durationTicks - elapsed;
             if (remaining <= 0) { finishAsDeath(player); continue; }
-            if (ticks % 2 == 0 && player.getPose() != Pose.SWIMMING) player.setPose(Pose.SWIMMING, true);
+            if (ticks % 10 == 0 && state.crawlVisual != null) state.crawlVisual.update(player.getLocation());
             if (ticks % 20 == 0) applyProgressiveEffects(player, elapsed / 20);
             if (ticks % 5 == 0) updateDeathBar(state);
             if (state.indicator != null && state.indicator.isValid() && ticks % 2 == 0) {
@@ -323,11 +343,13 @@ public final class KnockdownManager implements Listener {
         Player player = Bukkit.getPlayer(state.playerId);
         if (state.deathBar != null) { state.deathBar.removeAll(); state.deathBar.setVisible(false); }
         if (state.indicator != null && state.indicator.isValid()) state.indicator.remove();
+        if (state.crawlVisual != null) state.crawlVisual.stop();
         if (player != null) {
             player.setInvulnerable(state.previousInvulnerable);
             player.setWalkSpeed(state.previousWalkSpeed);
             if (state.previousFixedPose) player.setPose(state.previousPose, true);
             else player.unsetFixedPose();
+            player.setSwimming(state.previousSwimming);
             player.removePotionEffect(PotionEffectType.NAUSEA);
             player.removePotionEffect(PotionEffectType.DARKNESS);
             if (state.previousNausea != null) player.addPotionEffect(state.previousNausea);
@@ -346,6 +368,7 @@ public final class KnockdownManager implements Listener {
         private final PotionEffect previousNausea, previousDarkness;
         private BossBar deathBar;
         private TextDisplay indicator;
+        private DownedCrawlVisual crawlVisual;
         private UUID reviverId;
         private DownedState(Player player, long startedAt, long durationTicks) {
             this.playerId = player.getUniqueId();
