@@ -92,10 +92,10 @@ public final class KnockdownManager implements Listener {
         player.setWalkSpeed(clampWalkSpeed(plugin.getConfig().getDouble("knockdown.crawl-speed", 0.06)));
 
         try {
-            state.indicator = spawnIndicator(player, 1.25, "§c§lDOWNED", 1.0f, true);
-            state.countdownIndicator = spawnIndicator(player, 1.00, "§f01:00", 0.68f, true);
+            state.countdownIndicator = spawnIndicator(player, 1.43, "§f01:00", 0.62f, true);
+            state.indicator = spawnIndicator(player, 1.15, "§c§lDOWNED", 0.82f, true);
             state.revivePrompt = spawnIndicator(player, 0.76,
-                    "§eRevive: §fHold SHIFT + Right-click", 0.55f, false);
+                    "§eRevive: §fHold SHIFT + Right-click", 0.44f, false);
         } catch (RuntimeException ex) {
             plugin.getLogger().warning("Could not create downed-player indicator: " + ex.getClass().getSimpleName());
         }
@@ -126,7 +126,10 @@ public final class KnockdownManager implements Listener {
         revivesByReviver.put(reviver.getUniqueId(), session);
         revivesByTarget.put(target.getUniqueId(), session);
         state.reviverId = reviver.getUniqueId();
-        if (state.indicator != null && state.indicator.isValid()) state.indicator.setText("§a§lREVIVING");
+        if (state.indicator != null && state.indicator.isValid()) {
+            state.indicator.setText("§a§lREVIVING");
+            setDisplayScale(state.indicator, 0.72f);
+        }
         if (state.revivePrompt != null && state.revivePrompt.isValid()) state.revivePrompt.setText("§aREVIVING...");
         session.bar = Bukkit.createBossBar("", BarColor.GREEN, BarStyle.SOLID);
         session.bar.addPlayer(reviver);
@@ -215,13 +218,16 @@ public final class KnockdownManager implements Listener {
             long remaining = state.durationTicks - elapsed;
             if (remaining <= 0) { finishAsDeath(player); continue; }
             if (ticks % 20 == 0) applyProgressiveEffects(player, elapsed / 20);
+            if (state.gsitCrawl != null && ticks % 5 == 0) {
+                state.gsitCrawl = GsitCrawlSupport.ensure(player, state.gsitCrawl, plugin);
+            }
             if (state.indicator != null && state.indicator.isValid() && ticks % 2 == 0) {
-                state.indicator.teleport(player.getLocation().add(0, 1.25, 0));
+                state.indicator.teleport(player.getLocation().add(0, 1.15, 0));
                 state.indicator.setText(state.reviverId == null ? "§c§lDOWNED" : "§a§lREVIVING");
             }
             if (state.countdownIndicator != null && state.countdownIndicator.isValid() && ticks % 2 == 0) {
                 long seconds = Math.max(0, (state.durationTicks - elapsed + 19) / 20);
-                state.countdownIndicator.teleport(player.getLocation().add(0, 1.00, 0));
+                state.countdownIndicator.teleport(player.getLocation().add(0, 1.43, 0));
                 state.countdownIndicator.setText(String.format(Locale.ROOT, "§f%02d:%02d", seconds / 60, seconds % 60));
             }
             if (state.revivePrompt != null && state.revivePrompt.isValid() && ticks % 10 == 0) {
@@ -281,7 +287,10 @@ public final class KnockdownManager implements Listener {
         DownedState state = downed.get(session.targetId);
         if (state != null) {
             state.reviverId = null;
-            if (state.indicator != null && state.indicator.isValid()) state.indicator.setText("§c§lDOWNED");
+            if (state.indicator != null && state.indicator.isValid()) {
+                state.indicator.setText("§c§lDOWNED");
+                setDisplayScale(state.indicator, 0.82f);
+            }
             if (state.revivePrompt != null && state.revivePrompt.isValid()) state.revivePrompt.setText("§eRevive: §fHold SHIFT + Right-click");
         }
         if (!showTitles) return;
@@ -360,6 +369,12 @@ public final class KnockdownManager implements Listener {
             if (nearby) viewer.showEntity(plugin, state.revivePrompt);
             else viewer.hideEntity(plugin, state.revivePrompt);
         }
+    }
+
+    private void setDisplayScale(TextDisplay display, float scale) {
+        display.setTransformation(new Transformation(
+                new Vector3f(0, 0, 0), new Quaternionf(),
+                new Vector3f(scale, scale, scale), new Quaternionf()));
     }
 
     private float clampWalkSpeed(double speed) { return (float) Math.max(-1.0, Math.min(1.0, speed)); }
