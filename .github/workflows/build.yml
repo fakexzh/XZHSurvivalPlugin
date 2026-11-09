@@ -3,7 +3,7 @@ name: Build plugin
 
 on:
   push:
-    branches: [main]
+    branches: [main, feature/knockdown-revive-system]
   pull_request:
     branches: [main]
 
