@@ -64,6 +64,10 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         return knockdownManager != null && knockdownManager.isDowned(player);
     }
 
+    public boolean isPlayerReviving(Player player) {
+        return knockdownManager != null && knockdownManager.isReviving(player);
+    }
+
     private void migrateRobberyAndCoinLootConfig() {
         boolean changed = false;
         if (!getConfig().getBoolean("migrations.robbery-coin-loot-20261109", false)) {
