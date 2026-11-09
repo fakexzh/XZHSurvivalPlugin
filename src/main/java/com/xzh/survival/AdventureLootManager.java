@@ -90,10 +90,8 @@ public final class AdventureLootManager implements Listener {
         if (!plugin.getConfig().getBoolean("adventure-loot.fishing.enabled", true)) return;
 
         // Keep the complete vanilla catch (fish, junk and treasure) unchanged.
-        event.getPlayer().sendMessage("§b§l🎣 FISHING §8» §fCaught §e" + caught.getItemStack().getAmount()
-                + "x §f" + prettyName(caught.getItemStack().getType()) + "§b!");
-        ItemStack coin = rollCoinReward("adventure-loot.fishing");
-        if (coin != null) {
+        // Bonus coin denominations use independent rolls: 5% for 100 coins and 1% for 1,000.
+        for (ItemStack coin : rollIndependentCoinRewards("adventure-loot.fishing")) {
             Item coinDrop = event.getPlayer().getWorld().dropItemNaturally(caught.getLocation(), coin);
             markLootSource(coinDrop, "fishing");
         }
