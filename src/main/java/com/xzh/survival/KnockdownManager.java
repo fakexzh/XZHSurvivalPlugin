@@ -22,14 +22,12 @@ import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
-import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerItemConsumeEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.event.player.PlayerToggleSneakEvent;
-import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -95,30 +93,13 @@ public final class KnockdownManager implements Listener {
             state.countdownIndicator = spawnIndicator(player, 1.43, "§f01:00", 0.62f, true);
             state.indicator = spawnIndicator(player, 1.15, "§c§lDOWNED", 0.82f, true);
             state.revivePrompt = spawnIndicator(player, 0.76,
-                    "§eRevive: §fHold SHIFT + Right-click", 0.44f, false);
+                    "§eRevive: §fHold SHIFT nearby", 0.44f, false);
         } catch (RuntimeException ex) {
             plugin.getLogger().warning("Could not create downed-player indicator: " + ex.getClass().getSimpleName());
         }
         player.sendTitle("§c§lYOU ARE DOWNED", "§7Crawl to safety. Someone can revive you.", 5, 45, 10);
     }
 
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
-    public void onInteractEntity(PlayerInteractEntityEvent event) {
-        Player reviver = event.getPlayer();
-        if (downed.containsKey(reviver.getUniqueId())) { event.setCancelled(true); return; }
-        if (!(event.getRightClicked() instanceof Player target)) return;
-        DownedState state = downed.get(target.getUniqueId());
-        if (state == null) return;
-        event.setCancelled(true);
-        if (event.getHand() != EquipmentSlot.HAND || !reviver.isSneaking()) return;
-        if (reviver.getUniqueId().equals(target.getUniqueId())
-                || revivesByReviver.containsKey(reviver.getUniqueId())
-                || revivesByTarget.containsKey(target.getUniqueId())) return;
-        double range = Math.max(1.0, plugin.getConfig().getDouble("knockdown.revive.range-blocks", 2.0));
-        if (!reviver.getWorld().equals(target.getWorld())
-                || reviver.getLocation().distanceSquared(target.getLocation()) > range * range) return;
-        startRevive(reviver, target, state);
-    }
 
     private void startRevive(Player reviver, Player target, DownedState state) {
         long duration = Math.max(1, plugin.getConfig().getInt("knockdown.revive.duration-seconds", 5)) * 20L;
@@ -149,11 +130,37 @@ public final class KnockdownManager implements Listener {
             cancelRevive(session, "You moved.", true);
     }
 
-    @EventHandler
-    public void onSneakReleased(PlayerToggleSneakEvent event) {
-        if (event.isSneaking()) return;
-        ReviveSession session = revivesByReviver.get(event.getPlayer().getUniqueId());
-        if (session != null) cancelRevive(session, "You released SHIFT.", true);
+    @EventHandler(ignoreCancelled = true)
+    public void onSneakChanged(PlayerToggleSneakEvent event) {
+        Player player = event.getPlayer();
+        if (!event.isSneaking()) {
+            ReviveSession session = revivesByReviver.get(player.getUniqueId());
+            if (session != null) cancelRevive(session, "You released SHIFT.", true);
+            return;
+        }
+
+        if (downed.containsKey(player.getUniqueId())
+                || revivesByReviver.containsKey(player.getUniqueId())) return;
+
+        double range = Math.max(1.0, plugin.getConfig().getDouble("knockdown.revive.range-blocks", 2.0));
+        double maxDistanceSquared = range * range;
+        Player nearestTarget = null;
+        DownedState nearestState = null;
+        double nearestDistanceSquared = maxDistanceSquared + 0.0001;
+
+        for (DownedState state : downed.values()) {
+            Player target = Bukkit.getPlayer(state.playerId);
+            if (target == null || !target.isOnline() || !player.getWorld().equals(target.getWorld())
+                    || revivesByTarget.containsKey(target.getUniqueId())) continue;
+            double distanceSquared = player.getLocation().distanceSquared(target.getLocation());
+            if (distanceSquared <= maxDistanceSquared && distanceSquared < nearestDistanceSquared) {
+                nearestDistanceSquared = distanceSquared;
+                nearestTarget = target;
+                nearestState = state;
+            }
+        }
+
+        if (nearestTarget != null && nearestState != null) startRevive(player, nearestTarget, nearestState);
     }
 
     @EventHandler(ignoreCancelled = true)
@@ -291,7 +298,7 @@ public final class KnockdownManager implements Listener {
                 state.indicator.setText("§c§lDOWNED");
                 setDisplayScale(state.indicator, 0.82f);
             }
-            if (state.revivePrompt != null && state.revivePrompt.isValid()) state.revivePrompt.setText("§eRevive: §fHold SHIFT + Right-click");
+            if (state.revivePrompt != null && state.revivePrompt.isValid()) state.revivePrompt.setText("§eRevive: §fHold SHIFT nearby");
         }
         if (!showTitles) return;
         Player reviver = Bukkit.getPlayer(session.reviverId);
