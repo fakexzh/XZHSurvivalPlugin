@@ -13,7 +13,7 @@ knockdown:
   crawl-speed: 0.06
   revive:
     duration-seconds: 5
-    range-blocks: 3.0
+    range-blocks: 2.0
     health: 2.0
   effects:
     nausea-start-seconds: 8
