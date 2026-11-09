@@ -162,8 +162,7 @@ public final class AdventureLootManager implements Listener {
         int progress = player.getPersistentDataContainer().getOrDefault(fishingQuestProgressKey, PersistentDataType.INTEGER, 0) + 1;
         if (progress >= goal) {
             player.getPersistentDataContainer().set(fishingQuestProgressKey, PersistentDataType.INTEGER, 0);
-            ItemStack reward = rollCoinReward("adventure-loot.fishing");
-            if (reward != null) {
+            for (ItemStack reward : rollIndependentCoinRewards("adventure-loot.fishing")) {
                 Item coinDrop = player.getWorld().dropItemNaturally(location, reward);
                 markLootSource(coinDrop, "fishing");
             }
