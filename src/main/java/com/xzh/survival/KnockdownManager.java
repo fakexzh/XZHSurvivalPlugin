@@ -22,6 +22,7 @@ import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
+import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerItemConsumeEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
@@ -222,6 +223,13 @@ public final class KnockdownManager implements Listener {
         ReviveSession session = revivesByReviver.get(player.getUniqueId());
         if (session != null) cancelRevive(session, "The reviver disconnected.", true);
         if (downed.containsKey(player.getUniqueId())) finishAsDeath(player);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onDownedPlayerCommand(PlayerCommandPreprocessEvent event) {
+        if (!isDowned(event.getPlayer())) return;
+        event.setCancelled(true);
+        event.getPlayer().sendMessage("§cYou cannot use commands while downed.");
     }
 
     private void tick() {
