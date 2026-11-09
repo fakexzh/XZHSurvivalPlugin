@@ -69,7 +69,7 @@ adventure-loot:
     coin-1000-chance: 0.01
   fishing:
     enabled: true
-    coin-100-chance: 0.10
+    coin-100-chance: 0.05
     coin-1000-chance: 0.01
     quest-enabled: true
     quest-catches: 10
