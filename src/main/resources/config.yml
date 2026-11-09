@@ -64,20 +64,12 @@ adventure-loot:
   mob-loot:
     enabled: true
     first-pickup-announcements: true
-    common-extra-chance: 0.04
-    rare-extra-chance: 0.005
-    extreme-rare-chance: 0.0002
-    coin-drop-chance: 0.08
-    coin-10-chance: 0.025
-    coin-100-chance: 0.001
-    coin-1000-chance: 0.0001
-    multiple-coins-chance: 0.005
+    coin-100-chance: 0.10
+    coin-1000-chance: 0.01
   fishing:
     enabled: true
-    bonus-reward-chance: 0.20
-    rare-reward-chance: 0.035
-    extreme-rare-chance: 0.001
-    coin-chance: 0.06
+    coin-100-chance: 0.10
+    coin-1000-chance: 0.01
     quest-enabled: true
     quest-catches: 10
   exploration:
@@ -88,6 +80,12 @@ adventure-loot:
     mob-loot-first-pickup-only: true
     coins-every-pickup: true
     coin-announcements-global: false
+
+robbery:
+  enabled: true
+  range-blocks: 2.0
+  duration-seconds: 7
+  steal-percent: 10
 
 dynamic-trading:
   enabled: true
