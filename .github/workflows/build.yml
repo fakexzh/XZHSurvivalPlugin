@@ -3,7 +3,7 @@ name: Build plugin
 
 on:
   push:
-    branches: [main, feature/knockdown-revive-system, fix/creative-inventory-vanilla-drops-coin-chances]
+    branches: [main, feature/knockdown-revive-system, fix/creative-inventory-vanilla-drops-coin-chances, fix/knockdown-hud-revive-cleanup-20261109]
   pull_request:
     branches: [main]
 
