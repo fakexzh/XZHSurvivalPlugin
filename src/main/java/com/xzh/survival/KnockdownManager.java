@@ -48,6 +48,10 @@ public final class KnockdownManager implements Listener {
 
     public KnockdownManager(JavaPlugin plugin) { this.plugin = plugin; }
 
+    public boolean isDowned(Player player) {
+        return player != null && downed.containsKey(player.getUniqueId());
+    }
+
     public void start() {
         Bukkit.getPluginManager().registerEvents(this, plugin);
         ticker = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, 1L, 1L);
