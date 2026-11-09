@@ -104,15 +104,9 @@ public final class AdventureLootManager implements Listener {
         Item item = event.getItem();
         ItemStack stack = item.getItemStack();
         if (isXzhCoin(stack)) {
-            int denomination = getCoinDenomination(stack);
-            long collectedValue = (long) denomination * stack.getAmount();
-            long totalCoins = getInventoryCoinTotal(event.getPlayer()) + collectedValue;
-            event.getPlayer().sendMessage("§f" + stack.getAmount() + "x §e"
-                    + String.format(Locale.US, "%,d", collectedValue) + " coins collected §8| §7("
-                    + String.format(Locale.US, "%,d", totalCoins) + " coins total§7)");
-            return;
+            // Coin pickups are intentionally silent.
         }
-        // Regular mob loot is intentionally silent. Fishing catches and bonus items are announced at catch time.
+        // All coin and fishing pickup announcements are intentionally disabled.
     }
 
     @EventHandler
@@ -175,10 +169,8 @@ public final class AdventureLootManager implements Listener {
                 Item coinDrop = player.getWorld().dropItemNaturally(location, reward);
                 markLootSource(coinDrop, "fishing");
             }
-            player.sendMessage("§b[Fishing Quest] §aComplete! You caught " + goal + " fish. A coin reward is waiting nearby.");
         } else {
             player.getPersistentDataContainer().set(fishingQuestProgressKey, PersistentDataType.INTEGER, progress);
-            if (progress % 5 == 0) player.sendMessage("§b[Fishing Quest] §fProgress: " + progress + "/" + goal + " catches.");
         }
     }
 
@@ -199,6 +191,23 @@ public final class AdventureLootManager implements Listener {
     private List<ItemStack> rollMobCoinRewards(String path) {
         double hundredChance = Math.max(0.0, Math.min(1.0,
                 plugin.getConfig().getDouble(path + ".coin-100-chance", 0.10)));
+        double thousandChance = Math.max(0.0, Math.min(1.0,
+                plugin.getConfig().getDouble(path + ".coin-1000-chance", 0.01)));
+        List<ItemStack> rewards = new ArrayList<>(2);
+        if (random.nextDouble() < hundredChance) {
+            ItemStack coin = createOfficialCoin(100, 1);
+            if (coin != null) rewards.add(coin);
+        }
+        if (random.nextDouble() < thousandChance) {
+            ItemStack coin = createOfficialCoin(1000, 1);
+            if (coin != null) rewards.add(coin);
+        }
+        return rewards;
+    }
+
+    private List<ItemStack> rollIndependentCoinRewards(String path) {
+        double hundredChance = Math.max(0.0, Math.min(1.0,
+                plugin.getConfig().getDouble(path + ".coin-100-chance", 0.05)));
         double thousandChance = Math.max(0.0, Math.min(1.0,
                 plugin.getConfig().getDouble(path + ".coin-1000-chance", 0.01)));
         List<ItemStack> rewards = new ArrayList<>(2);
