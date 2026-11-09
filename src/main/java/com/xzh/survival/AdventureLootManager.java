@@ -55,17 +55,15 @@ public final class AdventureLootManager implements Listener {
 
     private void migrateMobCoinChances() {
         boolean changed = false;
-        String hundredPath = "adventure-loot.mob-loot.coin-100-chance";
-        String thousandPath = "adventure-loot.mob-loot.coin-1000-chance";
-        // Upgrade the old bundled defaults for existing servers without overwriting
-        // any custom values an administrator has already chosen.
-        if (!plugin.getConfig().contains(hundredPath)
-                || Double.compare(plugin.getConfig().getDouble(hundredPath), 0.001) == 0) {
+        String hundredPath = "adventure-loot.mob-loot.mob-coin-100-chance";
+        String thousandPath = "adventure-loot.mob-loot.mob-coin-1000-chance";
+        // Add mob-only probabilities to existing installations. Do not change the
+        // general reward probabilities used by fishing, village chests and bartering.
+        if (!plugin.getConfig().contains(hundredPath)) {
             plugin.getConfig().set(hundredPath, 0.900);
             changed = true;
         }
-        if (!plugin.getConfig().contains(thousandPath)
-                || Double.compare(plugin.getConfig().getDouble(thousandPath), 0.0001) == 0) {
+        if (!plugin.getConfig().contains(thousandPath)) {
             plugin.getConfig().set(thousandPath, 0.500);
             changed = true;
         }
@@ -95,9 +93,9 @@ public final class AdventureLootManager implements Listener {
         // Roll each requested denomination independently. Vanilla drops stay untouched;
         // both coin stacks may be added to the same mob's normal drop list.
         double hundredChance = clampChance(plugin.getConfig().getDouble(
-                "adventure-loot.mob-loot.coin-100-chance", 0.900));
+                "adventure-loot.mob-loot.mob-coin-100-chance", 0.900));
         double thousandChance = clampChance(plugin.getConfig().getDouble(
-                "adventure-loot.mob-loot.coin-1000-chance", 0.500));
+                "adventure-loot.mob-loot.mob-coin-1000-chance", 0.500));
         if (random.nextDouble() < hundredChance) {
             ItemStack coins = createOfficialCoin(100, 1);
             if (coins != null) event.getDrops().add(coins);
