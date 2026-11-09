@@ -60,8 +60,9 @@ public final class AdventureLootManager implements Listener {
         if (mob.getKiller() == null) return;
 
         // Preserve every vanilla mob drop. Survival adds only the configured tagged coin reward.
-        ItemStack coin = rollCoinReward("adventure-loot.mob-loot");
-        if (coin != null) event.getDrops().add(coin);
+        // The two denominations use independent rolls: 10% for 100 coins and 1% for 1,000.
+        // Keep all vanilla drops intact and append each successful XZH coin roll.
+        event.getDrops().addAll(rollMobCoinRewards("adventure-loot.mob-loot"));
 
         org.bukkit.Location deathLocation = mob.getLocation().clone();
         org.bukkit.World deathWorld = mob.getWorld();
@@ -193,6 +194,23 @@ public final class AdventureLootManager implements Listener {
             item.setItemMeta(book);
         }
         return item;
+    }
+
+    private List<ItemStack> rollMobCoinRewards(String path) {
+        double hundredChance = Math.max(0.0, Math.min(1.0,
+                plugin.getConfig().getDouble(path + ".coin-100-chance", 0.10)));
+        double thousandChance = Math.max(0.0, Math.min(1.0,
+                plugin.getConfig().getDouble(path + ".coin-1000-chance", 0.01)));
+        List<ItemStack> rewards = new ArrayList<>(2);
+        if (random.nextDouble() < hundredChance) {
+            ItemStack coin = createOfficialCoin(100, 1);
+            if (coin != null) rewards.add(coin);
+        }
+        if (random.nextDouble() < thousandChance) {
+            ItemStack coin = createOfficialCoin(1000, 1);
+            if (coin != null) rewards.add(coin);
+        }
+        return rewards;
     }
 
     private ItemStack rollCoinReward(String path) {
