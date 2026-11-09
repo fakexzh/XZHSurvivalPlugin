@@ -57,7 +57,7 @@ public final class RobberyManager implements Listener {
             return;
         }
         if (!plugin.getConfig().getBoolean("robbery.enabled", true)
-                || plugin.isPlayerDowned(robber)
+                || plugin.isPlayerDowned(robber) || plugin.isPlayerReviving(robber)
                 || robber.getGameMode() == GameMode.SPECTATOR
                 || robber.getGameMode() == GameMode.CREATIVE
                 || byRobber.containsKey(robber.getUniqueId())) return;
@@ -91,6 +91,7 @@ public final class RobberyManager implements Listener {
         if (!plugin.getConfig().getBoolean("robbery.enabled", true)) return;
         for (Player robber : Bukkit.getOnlinePlayers()) {
             if (byRobber.containsKey(robber.getUniqueId()) || plugin.isPlayerDowned(robber)
+                    || plugin.isPlayerReviving(robber)
                     || robber.isDead() || robber.getGameMode() == GameMode.SPECTATOR
                     || robber.getGameMode() == GameMode.CREATIVE) continue;
             Player victim = nearestEligibleVictim(robber);
