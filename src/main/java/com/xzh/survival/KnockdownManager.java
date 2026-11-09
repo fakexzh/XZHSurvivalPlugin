@@ -8,6 +8,7 @@ import org.bukkit.boss.BarStyle;
 import org.bukkit.boss.BossBar;
 import org.bukkit.entity.Display;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Pose;
 import org.bukkit.entity.TextDisplay;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -83,7 +84,9 @@ public final class KnockdownManager implements Listener {
         player.setHealth(1.0);
         player.setInvulnerable(true);
         player.setSprinting(false);
-        player.setSwimming(true);
+        // setSwimming() is deprecated and is immediately reverted by Paper.
+        // A fixed SWIMMING pose forces the actual prone crawl animation on Java clients.
+        player.setPose(Pose.SWIMMING, true);
         player.setWalkSpeed(clampWalkSpeed(plugin.getConfig().getDouble("knockdown.crawl-speed", 0.06)));
         state.deathBar = Bukkit.createBossBar("", BarColor.RED, BarStyle.SOLID);
         state.deathBar.addPlayer(player);
@@ -218,7 +221,7 @@ public final class KnockdownManager implements Listener {
             long elapsed = ticks - state.startedAt;
             long remaining = state.durationTicks - elapsed;
             if (remaining <= 0) { finishAsDeath(player); continue; }
-            if (ticks % 2 == 0 && !player.isSwimming()) player.setSwimming(true);
+            if (ticks % 2 == 0 && player.getPose() != Pose.SWIMMING) player.setPose(Pose.SWIMMING, true);
             if (ticks % 20 == 0) applyProgressiveEffects(player, elapsed / 20);
             if (ticks % 5 == 0) updateDeathBar(state);
             if (state.indicator != null && state.indicator.isValid() && ticks % 2 == 0) {
@@ -323,7 +326,8 @@ public final class KnockdownManager implements Listener {
         if (player != null) {
             player.setInvulnerable(state.previousInvulnerable);
             player.setWalkSpeed(state.previousWalkSpeed);
-            player.setSwimming(state.previousSwimming);
+            if (state.previousFixedPose) player.setPose(state.previousPose, true);
+            else player.unsetFixedPose();
             player.removePotionEffect(PotionEffectType.NAUSEA);
             player.removePotionEffect(PotionEffectType.DARKNESS);
             if (state.previousNausea != null) player.addPotionEffect(state.previousNausea);
@@ -337,7 +341,8 @@ public final class KnockdownManager implements Listener {
         private final UUID playerId;
         private final long startedAt, durationTicks;
         private final float previousWalkSpeed;
-        private final boolean previousInvulnerable, previousSwimming;
+        private final boolean previousInvulnerable, previousSwimming, previousFixedPose;
+        private final Pose previousPose;
         private final PotionEffect previousNausea, previousDarkness;
         private BossBar deathBar;
         private TextDisplay indicator;
@@ -349,6 +354,8 @@ public final class KnockdownManager implements Listener {
             this.previousWalkSpeed = player.getWalkSpeed();
             this.previousInvulnerable = player.isInvulnerable();
             this.previousSwimming = player.isSwimming();
+            this.previousPose = player.getPose();
+            this.previousFixedPose = player.hasFixedPose();
             this.previousNausea = player.getPotionEffect(PotionEffectType.NAUSEA);
             this.previousDarkness = player.getPotionEffect(PotionEffectType.DARKNESS);
         }
