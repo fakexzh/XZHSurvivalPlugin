@@ -32,11 +32,13 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
     private BossChallengeManager bossChallengeManager;
     private TimeCycleManager timeCycleManager;
     private KnockdownManager knockdownManager;
+    private RobberyManager robberyManager;
 
     @Override
     public void onEnable() {
         migrateLegacyDataFolder();
         saveDefaultConfig();
+        migrateRobberyAndCoinLootConfig();
         getServer().getPluginManager().registerEvents(this, this);
         getServer().getPluginManager().registerEvents(new VillagerWorkstationResetListener(this), this);
         survivalFeatureManager = new SurvivalFeatureManager(this);
@@ -53,7 +55,33 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         timeCycleManager.start();
         knockdownManager = new KnockdownManager(this);
         knockdownManager.start();
+        robberyManager = new RobberyManager(this);
+        robberyManager.start();
         getLogger().info("Survival plugin enabled.");
+    }
+
+    public boolean isPlayerDowned(Player player) {
+        return knockdownManager != null && knockdownManager.isDowned(player);
+    }
+
+    private void migrateRobberyAndCoinLootConfig() {
+        boolean changed = false;
+        if (!getConfig().getBoolean("migrations.robbery-coin-loot-20261109", false)) {
+            getConfig().set("adventure-loot.mob-loot.coin-100-chance", 0.10);
+            getConfig().set("adventure-loot.mob-loot.coin-1000-chance", 0.01);
+            getConfig().set("adventure-loot.fishing.coin-100-chance", 0.10);
+            getConfig().set("adventure-loot.fishing.coin-1000-chance", 0.01);
+            getConfig().set("migrations.robbery-coin-loot-20261109", true);
+            changed = true;
+        }
+        if (!getConfig().contains("robbery.enabled")) { getConfig().set("robbery.enabled", true); changed = true; }
+        if (!getConfig().contains("robbery.range-blocks")) { getConfig().set("robbery.range-blocks", 2.0); changed = true; }
+        if (!getConfig().contains("robbery.duration-seconds")) { getConfig().set("robbery.duration-seconds", 7); changed = true; }
+        if (!getConfig().contains("robbery.steal-percent")) { getConfig().set("robbery.steal-percent", 10); changed = true; }
+        if (changed) {
+            saveConfig();
+            getLogger().info("Migrated robbery and coin reward settings.");
+        }
     }
 
     private void migrateLegacyDataFolder() {
@@ -84,6 +112,7 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         if (survivalFeatureManager != null) survivalFeatureManager.shutdown();
         if (bossChallengeManager != null) bossChallengeManager.shutdown();
         if (timeCycleManager != null) timeCycleManager.shutdown();
+        if (robberyManager != null) robberyManager.shutdown();
         if (knockdownManager != null) knockdownManager.shutdown();
     }
 
