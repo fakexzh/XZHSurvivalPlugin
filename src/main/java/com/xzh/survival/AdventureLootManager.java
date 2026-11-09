@@ -58,34 +58,11 @@ public final class AdventureLootManager implements Listener {
                 || !plugin.getConfig().getBoolean("adventure-loot.mob-loot.enabled", true)) return;
         LivingEntity mob = event.getEntity();
         if (mob.getKiller() == null) return;
-        int mobLevel = Math.max(1, mob.getPersistentDataContainer().getOrDefault(monsterLevelKey, PersistentDataType.INTEGER, 1));
-        double rare = Math.min(0.005, plugin.getConfig().getDouble("adventure-loot.mob-loot.rare-extra-chance", 0.005) + (mobLevel - 1) * 0.00005);
-        double common = Math.min(0.06, plugin.getConfig().getDouble("adventure-loot.mob-loot.common-extra-chance", 0.04) + (mobLevel - 1) * 0.0002);
-        if (random.nextDouble() < common) {
-            Material[] commonLoot = {Material.IRON_INGOT, Material.GOLD_NUGGET, Material.COPPER_INGOT,
-                    Material.LAPIS_LAZULI, Material.STRING, Material.LEATHER, Material.BREAD};
-            event.getDrops().add(new ItemStack(commonLoot[random.nextInt(commonLoot.length)],
-                    1 + random.nextInt(3)));
-        }
-        if (random.nextDouble() < rare) {
-            Material[] rareLoot = {Material.EMERALD, Material.BOOK, Material.GOLD_INGOT,
-                    Material.IRON_BLOCK, Material.OBSIDIAN, Material.EXPERIENCE_BOTTLE};
-            event.getDrops().add(new ItemStack(rareLoot[random.nextInt(rareLoot.length)], 1));
-        }
-        double coinChance = Math.min(0.08, plugin.getConfig().getDouble("adventure-loot.mob-loot.coin-drop-chance", 0.08) + (mobLevel - 1) * 0.0002);
-        if (random.nextDouble() < coinChance) {
-            ItemStack coin = rollCoinReward("adventure-loot.mob-loot", mobLevel >= 80 ? 1000 : mobLevel >= 50 ? 100 : mobLevel >= 20 ? 10 : 1);
-            if (coin != null) event.getDrops().add(coin);
-        }
-        double extremeChance = Math.min(0.0002, plugin.getConfig().getDouble("adventure-loot.mob-loot.extreme-rare-chance", 0.0002) + (mobLevel - 1) * 0.000001);
-        if (random.nextDouble() < extremeChance) {
-            Material[] extreme = {Material.DIAMOND, Material.NETHERITE_SCRAP,
-                    Material.GOLD_BLOCK, Material.DIAMOND_BLOCK};
-            event.getDrops().add(createLootItem(extreme[random.nextInt(extreme.length)]));
-        }
-        // Enchanted books are exceptionally rare: 0.001% per mob reward roll.
-        if (random.nextDouble() < 0.00001) event.getDrops().add(createLootItem(Material.ENCHANTED_BOOK));
-        // Tag only entities matching this mob's actual drop list, avoiding unrelated nearby items.
+
+        // Preserve every vanilla mob drop. Survival adds only the configured tagged coin reward.
+        ItemStack coin = rollCoinReward("adventure-loot.mob-loot");
+        if (coin != null) event.getDrops().add(coin);
+
         org.bukkit.Location deathLocation = mob.getLocation().clone();
         org.bukkit.World deathWorld = mob.getWorld();
         List<ItemStack> expectedDrops = event.getDrops().stream().map(ItemStack::clone)
@@ -109,60 +86,16 @@ public final class AdventureLootManager implements Listener {
         if (event.getState() != PlayerFishEvent.State.CAUGHT_FISH) return;
         if (!(event.getCaught() instanceof Item caught)) return;
         progressFishingQuest(event.getPlayer(), caught.getLocation());
-        // Vanilla treasure fishing can produce enchanted books; keep only a 0.001% chance.
-        if (caught.getItemStack().getType() == Material.ENCHANTED_BOOK && random.nextDouble() >= 0.00001) {
-            caught.remove();
-            return;
-        }
         if (!plugin.getConfig().getBoolean("adventure-loot.fishing.enabled", true)) return;
+
+        // Keep the complete vanilla catch (fish, junk and treasure) unchanged.
         event.getPlayer().sendMessage("§b§l🎣 FISHING §8» §fCaught §e" + caught.getItemStack().getAmount()
                 + "x §f" + prettyName(caught.getItemStack().getType()) + "§b!");
-        double coinChance = plugin.getConfig().getDouble("adventure-loot.fishing.coin-chance", 0.06);
-        if (random.nextDouble() < coinChance) {
-            ItemStack coin = rollCoinReward("adventure-loot.mob-loot");
-            if (coin != null) {
-                Item coinDrop = event.getPlayer().getWorld().dropItemNaturally(caught.getLocation(), coin);
-                markLootSource(coinDrop, "fishing");
-            }
+        ItemStack coin = rollCoinReward("adventure-loot.fishing");
+        if (coin != null) {
+            Item coinDrop = event.getPlayer().getWorld().dropItemNaturally(caught.getLocation(), coin);
+            markLootSource(coinDrop, "fishing");
         }
-        // Independent enchanted-book roll: 0.001% per fishing catch, not per bonus tier.
-        if (random.nextDouble() < 0.00001) {
-            Item book = event.getPlayer().getWorld().dropItemNaturally(caught.getLocation(), createLootItem(Material.ENCHANTED_BOOK));
-            markMobLoot(book);
-            event.getPlayer().sendMessage("§d§l✦ FISHING BONUS §8» §fUltra-rare enchanted book!");
-        }
-        double bonusChance = plugin.getConfig().getDouble("adventure-loot.fishing.bonus-reward-chance", 0.20);
-        if (random.nextDouble() >= bonusChance) return;
-        Material reward;
-        double roll = random.nextDouble();
-        if (roll < plugin.getConfig().getDouble("adventure-loot.fishing.extreme-rare-chance", 0.001)) {
-            Material[] extreme = {Material.DIAMOND, Material.NETHERITE_SCRAP};
-            reward = extreme[random.nextInt(extreme.length)];
-        } else if (roll < plugin.getConfig().getDouble("adventure-loot.fishing.rare-reward-chance", 0.035)) {
-            Material[] rare = {Material.NAME_TAG, Material.SADDLE, Material.GOLD_INGOT, Material.DIAMOND};
-            reward = rare[random.nextInt(rare.length)];
-        } else {
-            String biome = caught.getLocation().getBlock().getBiome().name();
-            Material[] ordinary;
-            if (biome.contains("OCEAN") || biome.contains("BEACH")) {
-                ordinary = new Material[]{Material.NAUTILUS_SHELL, Material.PRISMARINE_SHARD, Material.INK_SAC,
-                        Material.COD, Material.SALMON, Material.GOLD_NUGGET};
-            } else if (biome.contains("RIVER") || biome.contains("SWAMP")) {
-                ordinary = new Material[]{Material.CLAY_BALL, Material.LILY_PAD, Material.SLIME_BALL,
-                        Material.INK_SAC, Material.STRING, Material.BOOK};
-            } else if (biome.contains("JUNGLE")) {
-                ordinary = new Material[]{Material.BAMBOO, Material.COCOA_BEANS, Material.TROPICAL_FISH,
-                        Material.BONE, Material.STRING, Material.GOLD_NUGGET};
-            } else {
-                ordinary = new Material[]{Material.IRON_INGOT, Material.GOLD_NUGGET, Material.STRING,
-                        Material.LEATHER, Material.BONE, Material.BOOK, Material.COPPER_INGOT};
-            }
-            reward = ordinary[random.nextInt(ordinary.length)];
-        }
-        Item extra = event.getPlayer().getWorld().dropItemNaturally(caught.getLocation(), createLootItem(reward));
-        markMobLoot(extra);
-        event.getPlayer().sendMessage("§d§l✦ FISHING BONUS §8» §fBonus item: §e" + prettyName(reward)
-                + " §7(dropped nearby)");
     }
 
     @EventHandler(ignoreCancelled = true)
@@ -183,22 +116,13 @@ public final class AdventureLootManager implements Listener {
 
     @EventHandler
     public void onBuriedTreasureLootGenerate(LootGenerateEvent event) {
-        // Apply the same 0.001% enchanted-book rule to generated chest/reward loot tables.
-        Iterator<ItemStack> iterator = event.getLoot().iterator();
-        while (iterator.hasNext()) {
-            ItemStack stack = iterator.next();
-            if (stack != null && stack.getType() == Material.ENCHANTED_BOOK && random.nextDouble() >= 0.00001) {
-                iterator.remove();
-            }
-        }
         if (!plugin.getConfig().getBoolean("adventure-loot.enabled", true)) return;
         if (event.getLootTable() == null || event.getLootTable().getKey() == null
                 || !event.getLootTable().getKey().getKey().endsWith("buried_treasure")) return;
-        // Add custom coin items to the generated vanilla buried-treasure loot.
-        ItemStack tenCoins = createOfficialCoin(10, 2 + random.nextInt(7));
-        ItemStack singleCoins = createOfficialCoin(1, 10 + random.nextInt(21));
-        if (tenCoins != null) event.getLoot().add(tenCoins);
-        if (singleCoins != null) event.getLoot().add(singleCoins);
+        ItemStack hundredCoins = createOfficialCoin(100, 2 + random.nextInt(7));
+        ItemStack thousandCoins = createOfficialCoin(1000, 1);
+        if (hundredCoins != null) event.getLoot().add(hundredCoins);
+        if (thousandCoins != null) event.getLoot().add(thousandCoins);
     }
 
     @EventHandler(ignoreCancelled = true)
@@ -245,7 +169,7 @@ public final class AdventureLootManager implements Listener {
         int progress = player.getPersistentDataContainer().getOrDefault(fishingQuestProgressKey, PersistentDataType.INTEGER, 0) + 1;
         if (progress >= goal) {
             player.getPersistentDataContainer().set(fishingQuestProgressKey, PersistentDataType.INTEGER, 0);
-            ItemStack reward = rollCoinReward("adventure-loot.mob-loot");
+            ItemStack reward = rollCoinReward("adventure-loot.fishing");
             if (reward != null) {
                 Item coinDrop = player.getWorld().dropItemNaturally(location, reward);
                 markLootSource(coinDrop, "fishing");
@@ -272,24 +196,14 @@ public final class AdventureLootManager implements Listener {
     }
 
     private ItemStack rollCoinReward(String path) {
-        return rollCoinReward(path, 10);
-    }
-
-    private ItemStack rollCoinReward(String path, int maximumDenomination) {
-        // 100/1000 coins are reserved for very high-level mobs; other sources cap at 10.
-        if (maximumDenomination < 10) {
-            return createOfficialCoin(1, random.nextDouble() < plugin.getConfig().getDouble(path + ".multiple-coins-chance", 0.005)
-                    ? 2 + random.nextInt(3) : 1);
-        }
-        double jackpot = plugin.getConfig().getDouble(path + ".coin-1000-chance", 0.0001);
-        double hundred = plugin.getConfig().getDouble(path + ".coin-100-chance", 0.001);
-        double ten = plugin.getConfig().getDouble(path + ".coin-10-chance", 0.025);
+        double thousandChance = Math.max(0.0, Math.min(1.0,
+                plugin.getConfig().getDouble(path + ".coin-1000-chance", 0.01)));
+        double hundredChance = Math.max(0.0, Math.min(1.0 - thousandChance,
+                plugin.getConfig().getDouble(path + ".coin-100-chance", 0.10)));
         double roll = random.nextDouble();
-        int denomination = maximumDenomination >= 1000 && roll < jackpot ? 1000
-                : maximumDenomination >= 100 && roll < jackpot + hundred ? 100
-                : maximumDenomination >= 10 && roll < jackpot + hundred + ten ? 10 : 1;
-        int amount = random.nextDouble() < plugin.getConfig().getDouble(path + ".multiple-coins-chance", 0.005) ? 2 + random.nextInt(3) : 1;
-        return createOfficialCoin(denomination, amount);
+        if (roll < thousandChance) return createOfficialCoin(1000, 1);
+        if (roll < thousandChance + hundredChance) return createOfficialCoin(100, 1);
+        return null;
     }
 
     private ItemStack createOfficialCoin(int denomination, int amount) {
