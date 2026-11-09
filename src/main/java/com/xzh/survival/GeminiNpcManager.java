@@ -76,6 +76,8 @@ public final class GeminiNpcManager implements Listener, CommandExecutor, TabCom
             command.setExecutor(this);
             command.setTabCompleter(this);
         }
+        PluginCommand askCommand = plugin.getCommand("ask");
+        if (askCommand != null) askCommand.setExecutor(this);
     }
 
     public void shutdown() {
@@ -371,6 +373,23 @@ public final class GeminiNpcManager implements Listener, CommandExecutor, TabCom
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if (command.getName().equalsIgnoreCase("ask")) {
+            if (!(sender instanceof Player player)) {
+                sender.sendMessage("This command can only be used by a player.");
+                return true;
+            }
+            if (args.length == 0) {
+                player.sendMessage("§6[Guide] §fUsage: §e/ask <question>");
+                return true;
+            }
+            String question = String.join(" ", args).trim();
+            if (question.isBlank()) {
+                player.sendMessage("§6[Guide] §fUsage: §e/ask <question>");
+                return true;
+            }
+            ask(player, question);
+            return true;
+        }
         if (!sender.hasPermission(ADMIN_PERMISSION)) {
             sender.sendMessage("§cYou do not have permission to manage the Survival Guide NPC.");
             return true;
