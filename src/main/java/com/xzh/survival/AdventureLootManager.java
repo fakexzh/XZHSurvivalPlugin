@@ -60,7 +60,7 @@ public final class AdventureLootManager implements Listener {
         if (mob.getKiller() == null) return;
 
         // Preserve every vanilla mob drop. Survival adds only the configured tagged coin reward.
-        // The two denominations use independent rolls: 10% for 100 coins and 1% for 1,000.
+        // The two denominations use independent rolls at the configured low probabilities.
         // Keep all vanilla drops intact and append each successful XZH coin roll.
         event.getDrops().addAll(rollMobCoinRewards("adventure-loot.mob-loot"));
 
@@ -87,14 +87,7 @@ public final class AdventureLootManager implements Listener {
         if (event.getState() != PlayerFishEvent.State.CAUGHT_FISH) return;
         if (!(event.getCaught() instanceof Item caught)) return;
         progressFishingQuest(event.getPlayer(), caught.getLocation());
-        if (!plugin.getConfig().getBoolean("adventure-loot.fishing.enabled", true)) return;
-
-        // Keep the complete vanilla catch (fish, junk and treasure) unchanged.
-        // Bonus coin denominations use independent rolls: 5% for 100 coins and 1% for 1,000.
-        for (ItemStack coin : rollIndependentCoinRewards("adventure-loot.fishing")) {
-            Item coinDrop = event.getPlayer().getWorld().dropItemNaturally(caught.getLocation(), coin);
-            markLootSource(coinDrop, "fishing");
-        }
+        // Fishing preserves vanilla catches and quest progress; it never creates bonus coins.
     }
 
     @EventHandler(ignoreCancelled = true)
@@ -185,23 +178,6 @@ public final class AdventureLootManager implements Listener {
     private List<ItemStack> rollMobCoinRewards(String path) {
         double hundredChance = Math.max(0.0, Math.min(1.0,
                 plugin.getConfig().getDouble(path + ".coin-100-chance", 0.10)));
-        double thousandChance = Math.max(0.0, Math.min(1.0,
-                plugin.getConfig().getDouble(path + ".coin-1000-chance", 0.01)));
-        List<ItemStack> rewards = new ArrayList<>(2);
-        if (random.nextDouble() < hundredChance) {
-            ItemStack coin = createOfficialCoin(100, 1);
-            if (coin != null) rewards.add(coin);
-        }
-        if (random.nextDouble() < thousandChance) {
-            ItemStack coin = createOfficialCoin(1000, 1);
-            if (coin != null) rewards.add(coin);
-        }
-        return rewards;
-    }
-
-    private List<ItemStack> rollIndependentCoinRewards(String path) {
-        double hundredChance = Math.max(0.0, Math.min(1.0,
-                plugin.getConfig().getDouble(path + ".coin-100-chance", 0.05)));
         double thousandChance = Math.max(0.0, Math.min(1.0,
                 plugin.getConfig().getDouble(path + ".coin-1000-chance", 0.01)));
         List<ItemStack> rewards = new ArrayList<>(2);
