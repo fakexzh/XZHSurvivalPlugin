@@ -3,7 +3,7 @@ name: Build plugin
 
 on:
   push:
-    branches: [main, feature/knockdown-revive-system]
+    branches: [main, feature/knockdown-revive-system, fix/restore-tree-chopping]
   pull_request:
     branches: [main]
 
