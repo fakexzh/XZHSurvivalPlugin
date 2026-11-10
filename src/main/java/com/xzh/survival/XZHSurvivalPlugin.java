@@ -40,6 +40,7 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         saveDefaultConfig();
         migrateRobberyAndCoinLootConfig();
         getServer().getPluginManager().registerEvents(this, this);
+        getServer().getPluginManager().registerEvents(new TreeChopListener(this), this);
         getServer().getPluginManager().registerEvents(new VillagerWorkstationResetListener(this), this);
         survivalFeatureManager = new SurvivalFeatureManager(this);
         survivalFeatureManager.start();
