@@ -16,6 +16,11 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.io.IOException;
+import java.io.File;
+import java.util.stream.Stream;
 
 public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
     private final Random random = new Random();
@@ -24,17 +29,17 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
     private AdventureLootManager adventureLootManager;
     private DynamicTradingManager dynamicTradingManager;
     private FarmingManager farmingManager;
-    private BossChallengeManager bossChallengeManager;
+    private TimeCycleManager timeCycleManager;
+    private KnockdownManager knockdownManager;
 
     @Override
     public void onEnable() {
+        migrateLegacyDataFolder();
         saveDefaultConfig();
+        migrateCoinLootConfig();
         getServer().getPluginManager().registerEvents(this, this);
+        getServer().getPluginManager().registerEvents(new TreeChopListener(this), this);
         getServer().getPluginManager().registerEvents(new VillagerWorkstationResetListener(this), this);
-        // Restore vanilla daylight cycling if an older plugin version left it disabled.
-        for (World world : Bukkit.getWorlds()) {
-            world.setGameRule(org.bukkit.GameRule.DO_DAYLIGHT_CYCLE, true);
-        }
         survivalFeatureManager = new SurvivalFeatureManager(this);
         survivalFeatureManager.start();
         adventureLootManager = new AdventureLootManager(this);
@@ -43,15 +48,65 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         dynamicTradingManager.start();
         farmingManager = new FarmingManager(this);
         farmingManager.start();
-        bossChallengeManager = new BossChallengeManager(this);
-        bossChallengeManager.start();
-        getLogger().info("XZH Survival Plugin enabled.");
+        timeCycleManager = new TimeCycleManager(this);
+        timeCycleManager.start();
+        knockdownManager = new KnockdownManager(this);
+        knockdownManager.start();
+        getLogger().info("Survival plugin enabled.");
+    }
+
+    public boolean isPlayerDowned(Player player) {
+        return knockdownManager != null && knockdownManager.isDowned(player);
+    }
+
+    public boolean isPlayerReviving(Player player) {
+        return knockdownManager != null && knockdownManager.isReviving(player);
+    }
+
+    private void migrateCoinLootConfig() {
+        boolean changed = false;
+        if (!getConfig().getBoolean("migrations.mob-fishing-coin-rates-20261109-v2", false)) {
+            getConfig().set("adventure-loot.mob-loot.coin-100-chance", 0.10);
+            getConfig().set("adventure-loot.mob-loot.coin-1000-chance", 0.01);
+            getConfig().set("adventure-loot.fishing.coin-100-chance", 0.05);
+            getConfig().set("adventure-loot.fishing.coin-1000-chance", 0.01);
+            getConfig().set("migrations.mob-fishing-coin-rates-20261109-v2", true);
+            changed = true;
+        }
+        if (changed) {
+            saveConfig();
+            getLogger().info("Migrated coin reward settings.");
+        }
+    }
+
+    private void migrateLegacyDataFolder() {
+        File target = getDataFolder();
+        File legacy = new File(target.getParentFile(), "XZHSurvivalPlugin");
+        if (!legacy.isDirectory() || legacy.equals(target)) return;
+        try {
+            Files.createDirectories(target.toPath());
+            try (Stream<Path> paths = Files.walk(legacy.toPath())) {
+                for (Path source : paths.toList()) {
+                    Path destination = target.toPath().resolve(legacy.toPath().relativize(source));
+                    if (Files.isDirectory(source)) {
+                        Files.createDirectories(destination);
+                    } else if (!Files.exists(destination)) {
+                        Files.createDirectories(destination.getParent());
+                        Files.copy(source, destination);
+                    }
+                }
+            }
+            getLogger().info("Migrated existing survival data.");
+        } catch (IOException exception) {
+            throw new IllegalStateException("Could not migrate existing survival data; startup aborted to protect saved data.", exception);
+        }
     }
 
     @Override
     public void onDisable() {
         if (survivalFeatureManager != null) survivalFeatureManager.shutdown();
-        if (bossChallengeManager != null) bossChallengeManager.shutdown();
+        if (timeCycleManager != null) timeCycleManager.shutdown();
+        if (knockdownManager != null) knockdownManager.shutdown();
     }
 
     @EventHandler
@@ -96,7 +151,7 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
             penalty = low + random.nextInt(Math.max(1, high - low + 1));
         }
 
-        // Replace vanilla's automatic death line with one consistent, global XZH announcement.
+        // Replace vanilla's automatic death line with one consistent, global announcement.
         String vanillaDeathMessage = event.getDeathMessage();
         event.setDeathMessage(null);
         double actualPenalty = deductBank(player, penalty);

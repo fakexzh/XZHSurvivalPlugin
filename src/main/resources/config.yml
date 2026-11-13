@@ -1,3 +1,24 @@
+# Independent Overworld day and night durations. Sleeping uses vanilla night-skip behavior.
+custom-time:
+  enabled: true
+  day-duration-minutes: 20.0
+  night-duration-minutes: 10.0
+  # Empty means every loaded Overworld. Otherwise list exact world folder names.
+  worlds: []
+
+# Knockdown and player revival. All status/progress feedback is HUD-only (no chat messages).
+knockdown:
+  enabled: true
+  duration-seconds: 60
+  crawl-speed: 0.06
+  revive:
+    duration-seconds: 5
+    range-blocks: 2.0
+    health: 2.0
+  effects:
+    nausea-start-seconds: 8
+    darkness-start-seconds: 20
+
 # Replant mature crops from their harvest drops and award small vanilla XP orbs.
 farming:
   enabled: true
@@ -40,23 +61,16 @@ mob-progression:
 
 adventure-loot:
   enabled: true
+  # Mob-kill rolls are 0.5% for 100 coins and 0.1% for 1,000. Fishing never generates coins; vanilla catches and quest progress are unchanged.
   mob-loot:
     enabled: true
     first-pickup-announcements: true
-    common-extra-chance: 0.04
-    rare-extra-chance: 0.005
-    extreme-rare-chance: 0.0002
-    coin-drop-chance: 0.08
-    coin-10-chance: 0.025
-    coin-100-chance: 0.001
-    coin-1000-chance: 0.0001
-    multiple-coins-chance: 0.005
+    coin-100-chance: 0.005
+    coin-1000-chance: 0.001
   fishing:
     enabled: true
-    bonus-reward-chance: 0.20
-    rare-reward-chance: 0.035
-    extreme-rare-chance: 0.001
-    coin-chance: 0.06
+    coin-100-chance: 0.0
+    coin-1000-chance: 0.0
     quest-enabled: true
     quest-catches: 10
   exploration:
@@ -86,11 +100,6 @@ dynamic-trading:
 combat-indicators:
   target-health-enabled: true
   target-range: 6.0
-
-# Global boss challenges run on a fixed hourly schedule.
-# Entry fee: 100 bank coins. Spawn distance: 16 blocks.
-# Rewards are written onto the glowing key: Common 350-500, Rare 500-1000, Legendary 1500-2500.
-
 
 # Breaking a villager's workstation releases the nearest matching villager and clears its trades.
 villager-workstation-reset:

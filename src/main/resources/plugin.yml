@@ -1,23 +1,16 @@
-name: XZHSurvivalPlugin
+name: Survival
 version: 1.0.0
 main: com.xzh.survival.XZHSurvivalPlugin
 api-version: '26.3'
-softdepend: [XZHEconomySystem]
-description: Survival quality-of-life and dimension death rules for XZH servers
+softdepend: [GSit, XZHEconomySystem]
+description: Survival gameplay features, knockdown and dimension death rules
 
 commands:
-  boss:
-    description: Spawn a boss for an arena encounter
-    usage: /boss <bossname|common|rare|legendary>
-    permission: xzhsurvival.boss.admin
-  sorry:
-    description: Surrender your active boss challenge
-    usage: /sorry
-  xzhboss:
-    description: Accept or reject a global boss challenge
-    usage: /xzhboss <accept|reject>
+  timecycle:
+    description: Manage independent day and night durations
+    usage: /timecycle <status|day|night|setday|setnight|pause|resume|reload|reset>
 
 permissions:
-  xzhsurvival.boss.admin:
-    description: Allows manually spawning boss encounters
+  survival.timecycle.admin:
+    description: Allows managing the custom day and night cycle
     default: op

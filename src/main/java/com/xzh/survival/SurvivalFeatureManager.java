@@ -66,8 +66,8 @@ public final class SurvivalFeatureManager implements Listener {
 
     public SurvivalFeatureManager(JavaPlugin plugin) {
         this.plugin = plugin;
-        this.monsterLevelKey = new NamespacedKey(plugin, "monster_level");
-        this.builtStepKey = new NamespacedKey(plugin, "monster_built_step");
+        this.monsterLevelKey = new NamespacedKey("xzhsurvivalplugin", "monster_level");
+        this.builtStepKey = new NamespacedKey("xzhsurvivalplugin", "monster_built_step");
         this.playtimeFile = new File(plugin.getDataFolder(), "playtime.yml");
     }
 
@@ -191,7 +191,7 @@ public final class SurvivalFeatureManager implements Listener {
         int currentLevel = getMonsterLevel(player);
         long savedSeconds = playtimeSeconds.getOrDefault(id, 0L);
         if (savedSeconds == 0L) {
-            Bukkit.broadcastMessage("§d§lXZH Survival §8» §f@" + player.getName() + " §ahas reached Monster Level 1!");
+            Bukkit.broadcastMessage("§d§lSurvival §8» §f@" + player.getName() + " §ahas reached Monster Level 1!");
             announcedMonsterLevels.put(id, 1);
         } else {
             // Avoid spamming old level announcements for players already established before this update.
@@ -209,7 +209,7 @@ public final class SurvivalFeatureManager implements Listener {
         }
         if (currentLevel <= previousAnnounced) return;
         for (int level = previousAnnounced + 1; level <= currentLevel; level++) {
-            Bukkit.broadcastMessage("§d§lXZH Survival §8» §f@" + player.getName() + " §ahas reached Monster Level " + level + "!");
+            Bukkit.broadcastMessage("§d§lSurvival §8» §f@" + player.getName() + " §ahas reached Monster Level " + level + "!");
         }
         announcedMonsterLevels.put(id, currentLevel);
         savePlaytime();
