@@ -1,5 +1,6 @@
 package com.xzh.survival;
 
+import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.Tag;
 import org.bukkit.block.Block;
@@ -37,11 +38,13 @@ public final class TreeChopListener implements Listener {
     private final Set<String> playerPlacedLogs = new HashSet<>();
     private final File placedLogsFile;
     private final YamlConfiguration placedLogsData = new YamlConfiguration();
+    private boolean placedLogsDirty;
 
     public TreeChopListener(JavaPlugin plugin) {
         this.plugin = plugin;
         this.placedLogsFile = new File(plugin.getDataFolder(), "player-placed-logs.yml");
         loadPlacedLogs();
+        Bukkit.getScheduler().runTaskTimer(plugin, this::flushPlacedLogs, 6000L, 6000L);
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
@@ -143,10 +146,23 @@ public final class TreeChopListener implements Listener {
     }
 
     private void savePlacedLogs() {
+        placedLogsDirty = true;
+    }
+
+    public void shutdown() {
+        flushPlacedLogs();
+    }
+
+    private void flushPlacedLogs() {
+        if (!placedLogsDirty) return;
         placedLogsData.set("blocks", playerPlacedLogs.stream().sorted().collect(Collectors.toList()));
         try {
-            if (!plugin.getDataFolder().exists()) plugin.getDataFolder().mkdirs();
+            if (!plugin.getDataFolder().exists() && !plugin.getDataFolder().mkdirs()) {
+                plugin.getLogger().warning("Could not create plugin data folder to save player-placed logs.");
+                return;
+            }
             placedLogsData.save(placedLogsFile);
+            placedLogsDirty = false;
         } catch (IOException exception) {
             plugin.getLogger().warning("Could not save player-placed log tracking: " + exception.getMessage());
         }
