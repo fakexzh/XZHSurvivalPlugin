@@ -109,7 +109,7 @@ public final class TimeCycleManager implements Listener, CommandExecutor, TabCom
     }
 
     private void tick() {
-        if (!enabled) return;
+        if (!enabled || states.isEmpty()) return;
         sleepScanCounter++;
         boolean refreshSleepState = sleepScanCounter >= 5;
         if (refreshSleepState) sleepScanCounter = 0;
