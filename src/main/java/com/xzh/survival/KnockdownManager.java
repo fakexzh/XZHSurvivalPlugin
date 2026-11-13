@@ -233,6 +233,7 @@ public final class KnockdownManager implements Listener {
     }
 
     private void tick() {
+        if (downed.isEmpty() && revivesByReviver.isEmpty()) return;
         ticks++;
         for (DownedState state : new ArrayList<>(downed.values())) {
             Player player = Bukkit.getPlayer(state.playerId);
