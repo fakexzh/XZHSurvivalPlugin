@@ -179,11 +179,12 @@ public final class TimeCycleManager implements Listener, CommandExecutor, TabCom
         // Vanilla requires time advancement to remain enabled while a player sleeps.
         // Re-enable it before the player enters the bed so the normal sleep countdown
         // and NIGHT_SKIP time-skip can complete without being interrupted.
+        WorldState state = states.computeIfAbsent(world.getUID(), ignored -> new WorldState());
+        state.sleeping = true;
         setAdvanceTime(world, true);
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            if (!hasSleepingPlayers(world)) {
-                setAdvanceTime(world, false);
-            }
+            state.sleeping = hasSleepingPlayers(world);
+            if (!state.sleeping) setAdvanceTime(world, false);
         }, 2L);
     }
 
@@ -200,9 +201,10 @@ public final class TimeCycleManager implements Listener, CommandExecutor, TabCom
     private void scheduleSleepStateSync(World world) {
         if (!enabled || !isManaged(world)) return;
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            if (!hasSleepingPlayers(world)) {
+            WorldState state = states.computeIfAbsent(world.getUID(), ignored -> new WorldState());
+            state.sleeping = hasSleepingPlayers(world);
+            if (!state.sleeping) {
                 setAdvanceTime(world, false);
-                WorldState state = states.computeIfAbsent(world.getUID(), ignored -> new WorldState());
                 state.fractionalTicks = 0.0;
             }
         }, 1L);
