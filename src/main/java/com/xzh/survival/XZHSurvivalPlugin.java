@@ -29,16 +29,14 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
     private AdventureLootManager adventureLootManager;
     private DynamicTradingManager dynamicTradingManager;
     private FarmingManager farmingManager;
-    private BossChallengeManager bossChallengeManager;
     private TimeCycleManager timeCycleManager;
     private KnockdownManager knockdownManager;
-    private RobberyManager robberyManager;
 
     @Override
     public void onEnable() {
         migrateLegacyDataFolder();
         saveDefaultConfig();
-        migrateRobberyAndCoinLootConfig();
+        migrateCoinLootConfig();
         getServer().getPluginManager().registerEvents(this, this);
         getServer().getPluginManager().registerEvents(new TreeChopListener(this), this);
         getServer().getPluginManager().registerEvents(new VillagerWorkstationResetListener(this), this);
@@ -50,14 +48,10 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         dynamicTradingManager.start();
         farmingManager = new FarmingManager(this);
         farmingManager.start();
-        bossChallengeManager = new BossChallengeManager(this);
-        bossChallengeManager.start();
         timeCycleManager = new TimeCycleManager(this);
         timeCycleManager.start();
         knockdownManager = new KnockdownManager(this);
         knockdownManager.start();
-        robberyManager = new RobberyManager(this);
-        robberyManager.start();
         getLogger().info("Survival plugin enabled.");
     }
 
@@ -69,7 +63,7 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         return knockdownManager != null && knockdownManager.isReviving(player);
     }
 
-    private void migrateRobberyAndCoinLootConfig() {
+    private void migrateCoinLootConfig() {
         boolean changed = false;
         if (!getConfig().getBoolean("migrations.mob-fishing-coin-rates-20261109-v2", false)) {
             getConfig().set("adventure-loot.mob-loot.coin-100-chance", 0.10);
@@ -79,13 +73,9 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
             getConfig().set("migrations.mob-fishing-coin-rates-20261109-v2", true);
             changed = true;
         }
-        if (!getConfig().contains("robbery.enabled")) { getConfig().set("robbery.enabled", true); changed = true; }
-        if (!getConfig().contains("robbery.range-blocks")) { getConfig().set("robbery.range-blocks", 2.0); changed = true; }
-        if (!getConfig().contains("robbery.duration-seconds")) { getConfig().set("robbery.duration-seconds", 7); changed = true; }
-        if (!getConfig().contains("robbery.steal-percent")) { getConfig().set("robbery.steal-percent", 10); changed = true; }
         if (changed) {
             saveConfig();
-            getLogger().info("Migrated robbery and coin reward settings.");
+            getLogger().info("Migrated coin reward settings.");
         }
     }
 
@@ -115,9 +105,7 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
     @Override
     public void onDisable() {
         if (survivalFeatureManager != null) survivalFeatureManager.shutdown();
-        if (bossChallengeManager != null) bossChallengeManager.shutdown();
         if (timeCycleManager != null) timeCycleManager.shutdown();
-        if (robberyManager != null) robberyManager.shutdown();
         if (knockdownManager != null) knockdownManager.shutdown();
     }
 
