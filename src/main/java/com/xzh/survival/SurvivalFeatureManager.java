@@ -84,7 +84,7 @@ public final class SurvivalFeatureManager implements Listener {
             hideOtherPlayersHealthDisplays(player);
         }
         ticker = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, 20L, 20L);
-        Bukkit.getScheduler().runTaskTimer(plugin, this::tryMonsterBuilding, 60L, 60L);
+        Bukkit.getScheduler().runTaskTimer(plugin, this::tryMonsterBuilding, 200L, 200L);
     }
 
     public void shutdown() {
@@ -110,8 +110,11 @@ public final class SurvivalFeatureManager implements Listener {
 
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
-        removeHealthDisplay(event.getPlayer().getUniqueId());
+        UUID playerId = event.getPlayer().getUniqueId();
+        removeHealthDisplay(playerId);
         savePlaytime();
+        announcedMonsterLevels.remove(playerId);
+        playtimeSeconds.remove(playerId);
     }
 
     @EventHandler(ignoreCancelled = true)
