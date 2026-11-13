@@ -42,9 +42,11 @@ public final class TimeCycleManager implements Listener, CommandExecutor, TabCom
     private boolean paused;
     private boolean started;
     private int taskId = -1;
+    private int sleepScanCounter;
 
     private static final class WorldState {
         private double fractionalTicks;
+        private boolean sleeping;
     }
 
     public TimeCycleManager(JavaPlugin plugin) {
@@ -60,7 +62,8 @@ public final class TimeCycleManager implements Listener, CommandExecutor, TabCom
     public void start() {
         for (World world : Bukkit.getWorlds()) {
             if (isManaged(world)) {
-                states.putIfAbsent(world.getUID(), new WorldState());
+                WorldState state = states.computeIfAbsent(world.getUID(), ignored -> new WorldState());
+                state.sleeping = hasSleepingPlayers(world);
                 synchronizeAdvanceTimeRule(world);
             }
         }
@@ -107,11 +110,15 @@ public final class TimeCycleManager implements Listener, CommandExecutor, TabCom
 
     private void tick() {
         if (!enabled) return;
+        sleepScanCounter++;
+        boolean refreshSleepState = sleepScanCounter >= 5;
+        if (refreshSleepState) sleepScanCounter = 0;
         for (World world : Bukkit.getWorlds()) {
             if (!isManaged(world)) continue;
             WorldState state = states.computeIfAbsent(world.getUID(), ignored -> new WorldState());
+            if (refreshSleepState) state.sleeping = hasSleepingPlayers(world);
 
-            if (hasSleepingPlayers(world)) {
+            if (state.sleeping) {
                 setAdvanceTime(world, true);
                 continue;
             }
