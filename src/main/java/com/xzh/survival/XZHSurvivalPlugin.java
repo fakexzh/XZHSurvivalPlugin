@@ -31,6 +31,7 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
     private FarmingManager farmingManager;
     private TimeCycleManager timeCycleManager;
     private KnockdownManager knockdownManager;
+    private TreeChopListener treeChopListener;
 
     @Override
     public void onEnable() {
@@ -38,7 +39,8 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         saveDefaultConfig();
         migrateCoinLootConfig();
         getServer().getPluginManager().registerEvents(this, this);
-        getServer().getPluginManager().registerEvents(new TreeChopListener(this), this);
+        treeChopListener = new TreeChopListener(this);
+        getServer().getPluginManager().registerEvents(treeChopListener, this);
         getServer().getPluginManager().registerEvents(new VillagerWorkstationResetListener(this), this);
         survivalFeatureManager = new SurvivalFeatureManager(this);
         survivalFeatureManager.start();
@@ -104,6 +106,7 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
 
     @Override
     public void onDisable() {
+        if (treeChopListener != null) treeChopListener.shutdown();
         if (survivalFeatureManager != null) survivalFeatureManager.shutdown();
         if (timeCycleManager != null) timeCycleManager.shutdown();
         if (knockdownManager != null) knockdownManager.shutdown();
