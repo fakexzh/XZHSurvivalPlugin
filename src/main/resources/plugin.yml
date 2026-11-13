@@ -6,16 +6,6 @@ softdepend: [GSit, XZHEconomySystem]
 description: Survival gameplay features, knockdown and dimension death rules
 
 commands:
-  boss:
-    description: Spawn a boss for an arena encounter
-    usage: /boss <bossname|easy|rare|legendary|enable|disable>
-    permission: xzhsurvival.boss.admin
-  sorry:
-    description: Surrender your active boss challenge
-    usage: /sorry
-  bosschallenge:
-    description: Accept or reject a global boss challenge
-    usage: /bosschallenge <accept|reject>
   timecycle:
     description: Manage independent day and night durations
     usage: /timecycle <status|day|night|setday|setnight|pause|resume|reload|reset>
@@ -23,7 +13,4 @@ commands:
 permissions:
   survival.timecycle.admin:
     description: Allows managing the custom day and night cycle
-    default: op
-  xzhsurvival.boss.admin:
-    description: Allows manually spawning boss encounters
     default: op
