@@ -42,9 +42,11 @@ public final class TimeCycleManager implements Listener, CommandExecutor, TabCom
     private boolean paused;
     private boolean started;
     private int taskId = -1;
+    private int sleepScanCounter;
 
     private static final class WorldState {
         private double fractionalTicks;
+        private boolean sleeping;
     }
 
     public TimeCycleManager(JavaPlugin plugin) {
@@ -60,7 +62,8 @@ public final class TimeCycleManager implements Listener, CommandExecutor, TabCom
     public void start() {
         for (World world : Bukkit.getWorlds()) {
             if (isManaged(world)) {
-                states.putIfAbsent(world.getUID(), new WorldState());
+                WorldState state = states.computeIfAbsent(world.getUID(), ignored -> new WorldState());
+                state.sleeping = hasSleepingPlayers(world);
                 synchronizeAdvanceTimeRule(world);
             }
         }
@@ -106,12 +109,16 @@ public final class TimeCycleManager implements Listener, CommandExecutor, TabCom
     }
 
     private void tick() {
-        if (!enabled) return;
+        if (!enabled || states.isEmpty()) return;
+        sleepScanCounter++;
+        boolean refreshSleepState = sleepScanCounter >= 5;
+        if (refreshSleepState) sleepScanCounter = 0;
         for (World world : Bukkit.getWorlds()) {
             if (!isManaged(world)) continue;
             WorldState state = states.computeIfAbsent(world.getUID(), ignored -> new WorldState());
+            if (refreshSleepState) state.sleeping = hasSleepingPlayers(world);
 
-            if (hasSleepingPlayers(world)) {
+            if (state.sleeping) {
                 setAdvanceTime(world, true);
                 continue;
             }
@@ -172,11 +179,12 @@ public final class TimeCycleManager implements Listener, CommandExecutor, TabCom
         // Vanilla requires time advancement to remain enabled while a player sleeps.
         // Re-enable it before the player enters the bed so the normal sleep countdown
         // and NIGHT_SKIP time-skip can complete without being interrupted.
+        WorldState state = states.computeIfAbsent(world.getUID(), ignored -> new WorldState());
+        state.sleeping = true;
         setAdvanceTime(world, true);
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            if (!hasSleepingPlayers(world)) {
-                setAdvanceTime(world, false);
-            }
+            state.sleeping = hasSleepingPlayers(world);
+            if (!state.sleeping) setAdvanceTime(world, false);
         }, 2L);
     }
 
@@ -193,9 +201,10 @@ public final class TimeCycleManager implements Listener, CommandExecutor, TabCom
     private void scheduleSleepStateSync(World world) {
         if (!enabled || !isManaged(world)) return;
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            if (!hasSleepingPlayers(world)) {
+            WorldState state = states.computeIfAbsent(world.getUID(), ignored -> new WorldState());
+            state.sleeping = hasSleepingPlayers(world);
+            if (!state.sleeping) {
                 setAdvanceTime(world, false);
-                WorldState state = states.computeIfAbsent(world.getUID(), ignored -> new WorldState());
                 state.fractionalTicks = 0.0;
             }
         }, 1L);

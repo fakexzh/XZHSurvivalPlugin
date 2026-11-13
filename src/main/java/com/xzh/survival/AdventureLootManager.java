@@ -14,7 +14,6 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDeathEvent;
-import org.bukkit.event.entity.ItemSpawnEvent;
 import org.bukkit.event.entity.PiglinBarterEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.world.LootGenerateEvent;
@@ -134,11 +133,6 @@ public final class AdventureLootManager implements Listener {
         Map<Integer, ItemStack> overflow = chest.getBlockInventory().addItem(coin);
         for (ItemStack item : overflow.values()) chest.getWorld().dropItemNaturally(chest.getLocation(), item);
         player.sendMessage("§6§eYou discovered coins hidden in this village chest!");
-    }
-
-    @EventHandler(ignoreCancelled = true)
-    public void onItemSpawn(ItemSpawnEvent event) {
-        // Vanilla mob drops are tagged by the one-tick scan scheduled in onMobDeath.
     }
 
     @EventHandler(ignoreCancelled = true)
