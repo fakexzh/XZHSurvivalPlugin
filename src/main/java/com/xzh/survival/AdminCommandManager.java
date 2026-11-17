@@ -143,44 +143,73 @@ public final class AdminCommandManager implements Listener, CommandExecutor, Tab
             sender.sendMessage("§cYou do not have permission to change gamemodes.");
             return true;
         }
-        if (args.length > 1) {
-            sender.sendMessage("§cUsage: /" + command + " [player]");
+        if (args.length == 0 && !(sender instanceof Player)) {
+            sender.sendMessage("§cUsage: /" + command + " <player|selector>");
             return true;
         }
 
-        Player target;
-        if (args.length == 1) {
-            String targetName = args[0].startsWith("@") ? args[0].substring(1) : args[0];
-            target = Bukkit.getPlayerExact(targetName);
-            if (target == null) {
-                sender.sendMessage("§cThat player is not online.");
-                return true;
-            }
-        } else if (sender instanceof Player player) {
-            target = player;
+        List<Player> targets;
+        if (args.length == 0) {
+            targets = List.of((Player) sender);
         } else {
-            sender.sendMessage("§cUsage: /" + command + " <player>");
-            return true;
+            String targetArgument = String.join(" ", args).trim();
+            if (targetArgument.startsWith("@")) {
+                try {
+                    targets = Bukkit.selectEntities(sender, targetArgument).stream()
+                            .filter(Player.class::isInstance)
+                            .map(Player.class::cast)
+                            .toList();
+                } catch (IllegalArgumentException exception) {
+                    sender.sendMessage("§cInvalid player selector. Try @a, @p, @r, @s or @e[type=player].");
+                    return true;
+                }
+            } else {
+                Player target = Bukkit.getPlayerExact(targetArgument);
+                targets = target == null ? List.of() : List.of(target);
+            }
         }
 
-        boolean changed = switch (command) {
-            case "gmc" -> enterCreative(target);
-            case "gms" -> enterSurvival(target);
-            case "gmsp" -> enterSpectator(target);
-            default -> false;
-        };
-        if (!changed) {
-            sender.sendMessage("§cGamemode was not changed because inventory data could not be saved.");
+        if (targets.isEmpty()) {
+            sender.sendMessage("§cNo online players matched that target.");
             return true;
         }
 
         String mode = switch (command) {
             case "gmc" -> "Creative";
             case "gms" -> "Survival";
-            default -> "Spectator";
+            case "gmsp" -> "Spectator";
+            default -> null;
         };
-        sender.sendMessage("§a" + target.getName() + " is now in " + mode + " mode.");
-        if (!sender.equals(target)) target.sendMessage("§eYour gamemode has been changed to " + mode + ".");
+        if (mode == null) return false;
+
+        int changed = 0;
+        int failed = 0;
+        for (Player target : targets) {
+            boolean success = switch (command) {
+                case "gmc" -> enterCreative(target);
+                case "gms" -> enterSurvival(target);
+                case "gmsp" -> enterSpectator(target);
+                default -> false;
+            };
+            if (success) {
+                changed++;
+                if (!sender.equals(target)) {
+                    target.sendMessage("§eYour gamemode has been changed to " + mode + ".");
+                }
+            } else {
+                failed++;
+            }
+        }
+
+        if (changed > 0) {
+            sender.sendMessage("§aChanged " + changed + (changed == 1 ? " player to " : " players to ")
+                    + mode + " mode.");
+        }
+        if (failed > 0) {
+            sender.sendMessage("§cCould not change " + failed
+                    + (failed == 1 ? " player because" : " players because")
+                    + " inventory data could not be saved.");
+        }
         return true;
     }
 
@@ -411,11 +440,16 @@ public final class AdminCommandManager implements Listener, CommandExecutor, Tab
         if (!sender.hasPermission(GAME_MODE_PERMISSION)) return List.of();
         String name = command.getName().toLowerCase(Locale.ROOT);
         if (!Set.of("gmc", "gms", "gmsp").contains(name) || args.length != 1) return List.of();
-        String prefix = args[0].startsWith("@") ? args[0].substring(1) : args[0];
-        String normalizedPrefix = prefix.toLowerCase(Locale.ROOT);
+
+        String prefix = args[0].toLowerCase(Locale.ROOT);
+        if (prefix.startsWith("@")) {
+            return List.of("@a", "@e[type=player]", "@p", "@r", "@s").stream()
+                    .filter(selector -> selector.startsWith(prefix))
+                    .toList();
+        }
         return Bukkit.getOnlinePlayers().stream()
                 .map(Player::getName)
-                .filter(playerName -> playerName.toLowerCase(Locale.ROOT).startsWith(normalizedPrefix))
+                .filter(playerName -> playerName.toLowerCase(Locale.ROOT).startsWith(prefix))
                 .sorted(String.CASE_INSENSITIVE_ORDER)
                 .toList();
     }
