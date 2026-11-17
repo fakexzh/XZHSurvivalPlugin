@@ -9,8 +9,23 @@ commands:
   timecycle:
     description: Manage independent day and night durations
     usage: /timecycle <status|day|night|setday|setnight|pause|resume|reload|reset>
+  fly:
+    description: Grant a player permission to fly
+    usage: /fly <player>
+    permission: survival.admin.fly
+  unfly:
+    description: Revoke a player's ability to fly
+    usage: /unfly <player>
+    permission: survival.admin.unfly
 
 permissions:
   survival.timecycle.admin:
     description: Allows managing the custom day and night cycle
+    default: op
+
+  survival.admin.fly:
+    description: Allows granting flight ability to other players
+    default: op
+  survival.admin.unfly:
+    description: Allows revoking flight ability from other players
     default: op
