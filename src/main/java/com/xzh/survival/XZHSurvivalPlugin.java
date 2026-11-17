@@ -54,6 +54,14 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         timeCycleManager.start();
         knockdownManager = new KnockdownManager(this);
         knockdownManager.start();
+        AdminFlyCommand flyCommand = new AdminFlyCommand(true);
+        getCommand("fly").setExecutor(flyCommand);
+        getCommand("fly").setTabCompleter(flyCommand);
+
+        AdminFlyCommand unflyCommand = new AdminFlyCommand(false);
+        getCommand("unfly").setExecutor(unflyCommand);
+        getCommand("unfly").setTabCompleter(unflyCommand);
+
         getLogger().info("Survival plugin enabled.");
     }
 
