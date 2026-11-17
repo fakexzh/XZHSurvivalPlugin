@@ -3,14 +3,44 @@ version: 1.0.0
 main: com.xzh.survival.XZHSurvivalPlugin
 api-version: '26.3'
 softdepend: [GSit, XZHEconomySystem]
-description: Survival gameplay features, knockdown and dimension death rules
+description: Survival gameplay features, knockdown, admin utilities and dimension death rules
 
 commands:
   timecycle:
     description: Manage independent day and night durations
     usage: /timecycle <status|day|night|setday|setnight|pause|resume|reload|reset>
+  gmc:
+    description: Switch to the isolated Creative inventory
+    usage: /gmc [player]
+    permission: survival.admin.gamemode
+  gms:
+    description: Restore the Survival inventory and gamemode
+    usage: /gms [player]
+    permission: survival.admin.gamemode
+  gmsp:
+    description: Switch to Spectator while preserving both inventories
+    usage: /gmsp [player]
+    permission: survival.admin.gamemode
+  sun:
+    description: Set clear weather
+    usage: /sun
+    permission: survival.admin.weather
+  rain:
+    description: Set rainy weather
+    usage: /rain
+    permission: survival.admin.weather
+  thunder:
+    description: Set thunder weather
+    usage: /thunder
+    permission: survival.admin.weather
 
 permissions:
   survival.timecycle.admin:
     description: Allows managing the custom day and night cycle
+    default: op
+  survival.admin.gamemode:
+    description: Allows using /gmc, /gms and /gmsp on yourself or other players
+    default: op
+  survival.admin.weather:
+    description: Allows using /sun, /rain and /thunder
     default: op
