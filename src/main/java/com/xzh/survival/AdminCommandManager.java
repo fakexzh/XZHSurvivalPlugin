@@ -22,7 +22,7 @@ import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
-import org.bukkit.inventory.InventoryType;
+import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -189,12 +189,13 @@ public final class AdminCommandManager implements Listener, CommandExecutor, Tab
         } else if (player.getGameMode() == GameMode.CREATIVE) {
             if (!saveInventory(player, "creative")) return false;
         }
+        if (!saveLastMode(player, "creative")) return false;
         player.getInventory().clear();
         player.getInventory().setArmorContents(new ItemStack[4]);
         player.getInventory().setItemInOffHand(null);
         loadInventory(player, "creative");
         player.setGameMode(GameMode.CREATIVE);
-        return saveLastMode(player, "creative");
+        return true;
     }
 
     private boolean enterSurvival(Player player) {
@@ -203,12 +204,13 @@ public final class AdminCommandManager implements Listener, CommandExecutor, Tab
         } else if (player.getGameMode() == GameMode.SURVIVAL || player.getGameMode() == GameMode.ADVENTURE) {
             if (!saveInventory(player, "survival")) return false;
         }
+        if (!saveLastMode(player, "survival")) return false;
         player.getInventory().clear();
         player.getInventory().setArmorContents(new ItemStack[4]);
         player.getInventory().setItemInOffHand(null);
         loadInventory(player, "survival");
         player.setGameMode(GameMode.SURVIVAL);
-        return saveLastMode(player, "survival");
+        return true;
     }
 
     private boolean enterSpectator(Player player) {
