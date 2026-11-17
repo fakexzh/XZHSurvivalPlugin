@@ -150,7 +150,8 @@ public final class AdminCommandManager implements Listener, CommandExecutor, Tab
 
         Player target;
         if (args.length == 1) {
-            target = Bukkit.getPlayerExact(args[0]);
+            String targetName = args[0].startsWith("@") ? args[0].substring(1) : args[0];
+            target = Bukkit.getPlayerExact(targetName);
             if (target == null) {
                 sender.sendMessage("§cThat player is not online.");
                 return true;
@@ -410,10 +411,11 @@ public final class AdminCommandManager implements Listener, CommandExecutor, Tab
         if (!sender.hasPermission(GAME_MODE_PERMISSION)) return List.of();
         String name = command.getName().toLowerCase(Locale.ROOT);
         if (!Set.of("gmc", "gms", "gmsp").contains(name) || args.length != 1) return List.of();
-        String prefix = args[0].toLowerCase(Locale.ROOT);
+        String prefix = args[0].startsWith("@") ? args[0].substring(1) : args[0];
+        String normalizedPrefix = prefix.toLowerCase(Locale.ROOT);
         return Bukkit.getOnlinePlayers().stream()
                 .map(Player::getName)
-                .filter(playerName -> playerName.toLowerCase(Locale.ROOT).startsWith(prefix))
+                .filter(playerName -> playerName.toLowerCase(Locale.ROOT).startsWith(normalizedPrefix))
                 .sorted(String.CASE_INSENSITIVE_ORDER)
                 .toList();
     }
