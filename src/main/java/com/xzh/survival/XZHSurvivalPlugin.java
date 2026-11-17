@@ -32,6 +32,7 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
     private TimeCycleManager timeCycleManager;
     private KnockdownManager knockdownManager;
     private TreeChopListener treeChopListener;
+    private AdminCommandManager adminCommandManager;
 
     @Override
     public void onEnable() {
@@ -54,6 +55,7 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
         timeCycleManager.start();
         knockdownManager = new KnockdownManager(this);
         knockdownManager.start();
+        adminCommandManager = new AdminCommandManager(this);
         getLogger().info("Survival plugin enabled.");
     }
 
@@ -106,6 +108,7 @@ public final class XZHSurvivalPlugin extends JavaPlugin implements Listener {
 
     @Override
     public void onDisable() {
+        if (adminCommandManager != null) adminCommandManager.shutdown();
         if (treeChopListener != null) treeChopListener.shutdown();
         if (survivalFeatureManager != null) survivalFeatureManager.shutdown();
         if (timeCycleManager != null) timeCycleManager.shutdown();

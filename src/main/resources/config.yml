@@ -45,6 +45,18 @@ death:
     minimum-bank-penalty: 200
     maximum-bank-penalty: 500
 
+# Independent inventories: Creative cannot transfer items to containers or drop items.
+# Restricted materials cannot be generated, picked up, transferred or placed while Creative.
+creative-restrictions:
+  blocked-items:
+    - DIAMOND_BLOCK
+    - IRON_BLOCK
+    - NETHERITE_BLOCK
+    - BEACON
+    - ANVIL
+    - CHIPPED_ANVIL
+    - DAMAGED_ANVIL
+
 # Individual lifetime online playtime; level 1 at start, +1 per accumulated hour.
 mob-progression:
   enabled: true
