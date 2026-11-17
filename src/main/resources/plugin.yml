@@ -18,6 +18,7 @@ commands:
     usage: /unfly <player>
     permission: survival.admin.unfly
 
+# Admin flight controls are available to operators by default.
 permissions:
   survival.timecycle.admin:
     description: Allows managing the custom day and night cycle
