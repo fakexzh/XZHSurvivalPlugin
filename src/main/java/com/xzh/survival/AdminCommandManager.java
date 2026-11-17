@@ -309,13 +309,25 @@ public final class AdminCommandManager implements Listener, CommandExecutor, Tab
                 player.getInventory().setItemInOffHand(null);
                 return;
             }
-            String inventoryName = mode == GameMode.CREATIVE ? "creative" : "survival";
-            if (!hasSavedInventory(player, inventoryName)) {
-                // First use: preserve the inventory already present in the player's vanilla data.
-                saveInventory(player, inventoryName);
-            } else {
-                loadInventory(player, inventoryName);
+            if (mode == GameMode.CREATIVE && !hasSavedInventory(player, "creative")) {
+                if (!hasSavedInventory(player, "survival")) {
+                    // First installation on a player who was already Creative: preserve their
+                    // pre-plugin inventory as Survival, then start the isolated Creative side empty.
+                    if (!saveInventory(player, "survival")) return;
+                    player.getInventory().clear();
+                    player.getInventory().setArmorContents(new ItemStack[4]);
+                    player.getInventory().setItemInOffHand(null);
+                    if (!saveInventory(player, "creative")) return;
+                } else {
+                    // A crash may have happened after switching modes but before the first
+                    // Creative save. Import the vanilla-persisted Creative inventory.
+                    if (!saveInventory(player, "creative")) return;
+                }
+                return;
             }
+            String inventoryName = mode == GameMode.CREATIVE ? "creative" : "survival";
+            if (!hasSavedInventory(player, inventoryName)) saveInventory(player, inventoryName);
+            else loadInventory(player, inventoryName);
         });
     }
 
