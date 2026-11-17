@@ -207,46 +207,54 @@ public final class AdminCommandManager implements Listener, CommandExecutor, Tab
         }
         if (failed > 0) {
             sender.sendMessage("§cCould not change " + failed
-                    + (failed == 1 ? " player because" : " players because")
-                    + " inventory data could not be saved.");
+                    + (failed == 1 ? " player: " : " players: ")
+                    + "their inventory could not be safely saved or restored.");
         }
         return true;
     }
 
+    private String activeInventoryName(Player player) {
+        return switch (player.getGameMode()) {
+            case CREATIVE -> "creative";
+            case SURVIVAL, ADVENTURE -> "survival";
+            default -> null;
+        };
+    }
+
+    private boolean saveEmptyInventory(Player player, String inventoryName) {
+        YamlConfiguration data = loadData(player);
+        String path = "inventories." + inventoryName;
+        data.set(path + ".storage", Arrays.asList(new ItemStack[36]));
+        data.set(path + ".armor", Arrays.asList(new ItemStack[4]));
+        data.set(path + ".offhand", null);
+        data.set("inventory-initialized." + inventoryName, true);
+        return saveData(player, data);
+    }
+
     private boolean enterCreative(Player player) {
-        if (player.getGameMode() == GameMode.SURVIVAL || player.getGameMode() == GameMode.ADVENTURE) {
-            if (!saveInventory(player, "survival")) return false;
-        } else if (player.getGameMode() == GameMode.CREATIVE) {
-            if (!saveInventory(player, "creative")) return false;
-        }
+        String active = activeInventoryName(player);
+        if (active != null && !saveInventory(player, active)) return false;
+        if (!hasSavedInventory(player, "creative") && !saveEmptyInventory(player, "creative")) return false;
+        if (!loadInventory(player, "creative")) return false;
         if (!saveLastMode(player, "creative")) return false;
-        player.getInventory().clear();
-        player.getInventory().setArmorContents(new ItemStack[4]);
-        player.getInventory().setItemInOffHand(null);
-        loadInventory(player, "creative");
         player.setGameMode(GameMode.CREATIVE);
         return true;
     }
 
     private boolean enterSurvival(Player player) {
-        if (player.getGameMode() == GameMode.CREATIVE) {
-            if (!saveInventory(player, "creative")) return false;
-        } else if (player.getGameMode() == GameMode.SURVIVAL || player.getGameMode() == GameMode.ADVENTURE) {
-            if (!saveInventory(player, "survival")) return false;
-        }
+        String active = activeInventoryName(player);
+        if (active != null && !saveInventory(player, active)) return false;
+        if (!hasSavedInventory(player, "survival") && !saveEmptyInventory(player, "survival")) return false;
+        if (!loadInventory(player, "survival")) return false;
         if (!saveLastMode(player, "survival")) return false;
-        player.getInventory().clear();
-        player.getInventory().setArmorContents(new ItemStack[4]);
-        player.getInventory().setItemInOffHand(null);
-        loadInventory(player, "survival");
         player.setGameMode(GameMode.SURVIVAL);
         return true;
     }
 
     private boolean enterSpectator(Player player) {
         if (player.getGameMode() == GameMode.SPECTATOR) return true;
-        String active = player.getGameMode() == GameMode.CREATIVE ? "creative" : "survival";
-        if (!saveInventory(player, active) || !saveLastMode(player, active)) return false;
+        String active = activeInventoryName(player);
+        if (active == null || !saveInventory(player, active) || !saveLastMode(player, active)) return false;
         player.getInventory().clear();
         player.getInventory().setArmorContents(new ItemStack[4]);
         player.getInventory().setItemInOffHand(null);
@@ -287,16 +295,30 @@ public final class AdminCommandManager implements Listener, CommandExecutor, Tab
         return saveData(player, data);
     }
 
-    private void loadInventory(Player player, String inventoryName) {
+    private boolean loadInventory(Player player, String inventoryName) {
         YamlConfiguration data = loadData(player);
         String path = "inventories." + inventoryName;
+        if (!data.getBoolean("inventory-initialized." + inventoryName, false)) {
+            plugin.getLogger().severe("Refusing to load missing " + inventoryName
+                    + " inventory for " + player.getName() + ".");
+            player.sendMessage("§cYour " + inventoryName
+                    + " inventory has no saved snapshot. Your current items were left untouched.");
+            return false;
+        }
+
         List<?> stored = data.getList(path + ".storage");
+        if (stored == null) {
+            plugin.getLogger().severe("Refusing to load incomplete " + inventoryName
+                    + " inventory for " + player.getName() + ": storage snapshot is missing.");
+            player.sendMessage("§cYour saved " + inventoryName
+                    + " inventory is incomplete. Your current items were left untouched.");
+            return false;
+        }
+
         ItemStack[] storage = new ItemStack[36];
-        if (stored != null) {
-            for (int i = 0; i < Math.min(storage.length, stored.size()); i++) {
-                Object item = stored.get(i);
-                if (item instanceof ItemStack stack) storage[i] = stack.clone();
-            }
+        for (int i = 0; i < Math.min(storage.length, stored.size()); i++) {
+            Object item = stored.get(i);
+            if (item instanceof ItemStack stack) storage[i] = stack.clone();
         }
 
         List<?> storedArmor = data.getList(path + ".armor");
@@ -309,10 +331,12 @@ public final class AdminCommandManager implements Listener, CommandExecutor, Tab
         }
 
         ItemStack offhand = data.getItemStack(path + ".offhand");
+        // Only mutate the live inventory after the complete snapshot has been read.
         player.getInventory().clear();
         player.getInventory().setStorageContents(storage);
         player.getInventory().setArmorContents(armor);
         player.getInventory().setItemInOffHand(offhand == null ? null : offhand.clone());
+        return true;
     }
 
     private boolean saveLastMode(Player player, String mode) {
@@ -333,31 +357,25 @@ public final class AdminCommandManager implements Listener, CommandExecutor, Tab
             if (!player.isOnline()) return;
             GameMode mode = player.getGameMode();
             if (mode == GameMode.SPECTATOR) {
-                if (!hasSavedInventory(player, "survival") && !saveInventory(player, "survival")) return;
+                if (!hasSavedInventory(player, "survival") && !saveEmptyInventory(player, "survival")) return;
                 player.getInventory().clear();
                 player.getInventory().setArmorContents(new ItemStack[4]);
                 player.getInventory().setItemInOffHand(null);
                 return;
             }
-            if (mode == GameMode.CREATIVE && !hasSavedInventory(player, "creative")) {
-                if (!hasSavedInventory(player, "survival")) {
-                    // First installation on a player who was already Creative: preserve their
-                    // pre-plugin inventory as Survival, then start the isolated Creative side empty.
-                    if (!saveInventory(player, "survival")) return;
-                    player.getInventory().clear();
-                    player.getInventory().setArmorContents(new ItemStack[4]);
-                    player.getInventory().setItemInOffHand(null);
-                    if (!saveInventory(player, "creative")) return;
-                } else {
-                    // A crash may have happened after switching modes but before the first
-                    // Creative save. Import the vanilla-persisted Creative inventory.
-                    if (!saveInventory(player, "creative")) return;
-                }
+
+            String active = mode == GameMode.CREATIVE ? "creative" : "survival";
+            if (!hasSavedInventory(player, active)) {
+                // First encounter: preserve the inventory currently loaded by Minecraft as
+                // the active mode's inventory instead of moving it to the wrong mode.
+                if (!saveInventory(player, active)) return;
+            } else if (!loadInventory(player, active)) {
+                // Never replace a live inventory with an absent or malformed snapshot.
                 return;
             }
-            String inventoryName = mode == GameMode.CREATIVE ? "creative" : "survival";
-            if (!hasSavedInventory(player, inventoryName)) saveInventory(player, inventoryName);
-            else loadInventory(player, inventoryName);
+
+            String other = active.equals("creative") ? "survival" : "creative";
+            if (!hasSavedInventory(player, other)) saveEmptyInventory(player, other);
         });
     }
 
