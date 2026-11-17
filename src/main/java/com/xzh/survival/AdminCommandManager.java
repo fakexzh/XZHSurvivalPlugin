@@ -40,6 +40,10 @@ public final class AdminCommandManager implements Listener, CommandExecutor, Tab
     private static final String GAME_MODE_PERMISSION = "survival.admin.gamemode";
     private static final String WEATHER_PERMISSION = "survival.admin.weather";
     private static final long WEATHER_DURATION_TICKS = 12_000L;
+    private static final Set<Material> DEFAULT_RESTRICTED_ITEMS = Set.of(
+            Material.DIAMOND_BLOCK, Material.IRON_BLOCK, Material.NETHERITE_BLOCK,
+            Material.BEACON, Material.ANVIL, Material.CHIPPED_ANVIL, Material.DAMAGED_ANVIL
+    );
 
     private final JavaPlugin plugin;
     private final File playerDataFolder;
@@ -48,12 +52,13 @@ public final class AdminCommandManager implements Listener, CommandExecutor, Tab
     public AdminCommandManager(JavaPlugin plugin) {
         this.plugin = plugin;
         this.playerDataFolder = new File(plugin.getDataFolder(), "gamemode-data");
-        this.restrictedCreativeItems = plugin.getConfig()
+        Set<Material> configured = plugin.getConfig()
                 .getStringList("creative-restrictions.blocked-items")
                 .stream()
                 .map(Material::matchMaterial)
                 .filter(material -> material != null)
                 .collect(Collectors.toUnmodifiableSet());
+        this.restrictedCreativeItems = configured.isEmpty() ? DEFAULT_RESTRICTED_ITEMS : configured;
 
         Bukkit.getPluginManager().registerEvents(this, plugin);
         register("gmc");
@@ -93,11 +98,8 @@ public final class AdminCommandManager implements Listener, CommandExecutor, Tab
         }
 
         List<World> worlds = new ArrayList<>();
-        if (sender instanceof Player player) {
-            worlds.add(player.getWorld());
-        } else {
-            worlds.addAll(Bukkit.getWorlds());
-        }
+        if (sender instanceof Player player) worlds.add(player.getWorld());
+        else worlds.addAll(Bukkit.getWorlds());
         if (worlds.isEmpty()) {
             sender.sendMessage("§cNo worlds are currently loaded.");
             return true;
@@ -131,7 +133,8 @@ public final class AdminCommandManager implements Listener, CommandExecutor, Tab
             case "rain" -> "rain";
             default -> "thunder";
         };
-        sender.sendMessage("§aSet " + state + " in " + worlds.size() + (worlds.size() == 1 ? " world." : " worlds."));
+        sender.sendMessage("§aSet " + state + " in " + worlds.size()
+                + (worlds.size() == 1 ? " world." : " worlds."));
         return true;
     }
 
@@ -159,63 +162,64 @@ public final class AdminCommandManager implements Listener, CommandExecutor, Tab
             return true;
         }
 
-        switch (command) {
+        boolean changed = switch (command) {
             case "gmc" -> enterCreative(target);
             case "gms" -> enterSurvival(target);
             case "gmsp" -> enterSpectator(target);
-            default -> {
-                return false;
-            }
+            default -> false;
+        };
+        if (!changed) {
+            sender.sendMessage("§cGamemode was not changed because inventory data could not be saved.");
+            return true;
         }
+
         String mode = switch (command) {
             case "gmc" -> "Creative";
             case "gms" -> "Survival";
             default -> "Spectator";
         };
         sender.sendMessage("§a" + target.getName() + " is now in " + mode + " mode.");
-        if (!sender.equals(target)) {
-            target.sendMessage("§eYour gamemode has been changed to " + mode + ".");
-        }
+        if (!sender.equals(target)) target.sendMessage("§eYour gamemode has been changed to " + mode + ".");
         return true;
     }
 
-    private void enterCreative(Player player) {
+    private boolean enterCreative(Player player) {
         if (player.getGameMode() == GameMode.SURVIVAL || player.getGameMode() == GameMode.ADVENTURE) {
-            saveInventory(player, "survival");
+            if (!saveInventory(player, "survival")) return false;
         } else if (player.getGameMode() == GameMode.CREATIVE) {
-            saveInventory(player, "creative");
+            if (!saveInventory(player, "creative")) return false;
         }
         player.getInventory().clear();
         player.getInventory().setArmorContents(new ItemStack[4]);
         player.getInventory().setItemInOffHand(null);
         loadInventory(player, "creative");
         player.setGameMode(GameMode.CREATIVE);
-        saveLastMode(player, "creative");
+        return saveLastMode(player, "creative");
     }
 
-    private void enterSurvival(Player player) {
+    private boolean enterSurvival(Player player) {
         if (player.getGameMode() == GameMode.CREATIVE) {
-            saveInventory(player, "creative");
+            if (!saveInventory(player, "creative")) return false;
         } else if (player.getGameMode() == GameMode.SURVIVAL || player.getGameMode() == GameMode.ADVENTURE) {
-            saveInventory(player, "survival");
+            if (!saveInventory(player, "survival")) return false;
         }
         player.getInventory().clear();
         player.getInventory().setArmorContents(new ItemStack[4]);
         player.getInventory().setItemInOffHand(null);
         loadInventory(player, "survival");
         player.setGameMode(GameMode.SURVIVAL);
-        saveLastMode(player, "survival");
+        return saveLastMode(player, "survival");
     }
 
-    private void enterSpectator(Player player) {
-        if (player.getGameMode() == GameMode.SPECTATOR) return;
+    private boolean enterSpectator(Player player) {
+        if (player.getGameMode() == GameMode.SPECTATOR) return true;
         String active = player.getGameMode() == GameMode.CREATIVE ? "creative" : "survival";
-        saveInventory(player, active);
-        saveLastMode(player, active);
+        if (!saveInventory(player, active) || !saveLastMode(player, active)) return false;
         player.getInventory().clear();
         player.getInventory().setArmorContents(new ItemStack[4]);
         player.getInventory().setItemInOffHand(null);
         player.setGameMode(GameMode.SPECTATOR);
+        return true;
     }
 
     private File dataFile(Player player) {
@@ -229,24 +233,26 @@ public final class AdminCommandManager implements Listener, CommandExecutor, Tab
         return YamlConfiguration.loadConfiguration(dataFile(player));
     }
 
-    private void saveData(Player player, YamlConfiguration data) {
+    private boolean saveData(Player player, YamlConfiguration data) {
         try {
             data.save(dataFile(player));
-        } catch (IOException exception) {
+            return true;
+        } catch (IOException | RuntimeException exception) {
             plugin.getLogger().severe("Could not save isolated inventories for " + player.getName()
                     + ": " + exception.getMessage());
             player.sendMessage("§cYour separated inventory data could not be saved. Notify an administrator.");
+            return false;
         }
     }
 
-    private void saveInventory(Player player, String inventoryName) {
+    private boolean saveInventory(Player player, String inventoryName) {
         YamlConfiguration data = loadData(player);
         String path = "inventories." + inventoryName;
         data.set(path + ".storage", Arrays.asList(player.getInventory().getStorageContents()));
         data.set(path + ".armor", Arrays.asList(player.getInventory().getArmorContents()));
         data.set(path + ".offhand", player.getInventory().getItemInOffHand());
         data.set("inventory-initialized." + inventoryName, true);
-        saveData(player, data);
+        return saveData(player, data);
     }
 
     private void loadInventory(Player player, String inventoryName) {
@@ -277,10 +283,10 @@ public final class AdminCommandManager implements Listener, CommandExecutor, Tab
         player.getInventory().setItemInOffHand(offhand == null ? null : offhand.clone());
     }
 
-    private void saveLastMode(Player player, String mode) {
+    private boolean saveLastMode(Player player, String mode) {
         YamlConfiguration data = loadData(player);
         data.set("last-active-mode", mode);
-        saveData(player, data);
+        return saveData(player, data);
     }
 
     private boolean hasSavedInventory(Player player, String mode) {
@@ -294,13 +300,14 @@ public final class AdminCommandManager implements Listener, CommandExecutor, Tab
         Bukkit.getScheduler().runTask(plugin, () -> {
             if (!player.isOnline()) return;
             GameMode mode = player.getGameMode();
-            String inventoryName = mode == GameMode.CREATIVE ? "creative" : "survival";
             if (mode == GameMode.SPECTATOR) {
+                if (!hasSavedInventory(player, "survival") && !saveInventory(player, "survival")) return;
                 player.getInventory().clear();
                 player.getInventory().setArmorContents(new ItemStack[4]);
                 player.getInventory().setItemInOffHand(null);
                 return;
             }
+            String inventoryName = mode == GameMode.CREATIVE ? "creative" : "survival";
             if (!hasSavedInventory(player, inventoryName)) {
                 // First use: preserve the inventory already present in the player's vanilla data.
                 saveInventory(player, inventoryName);
@@ -336,24 +343,19 @@ public final class AdminCommandManager implements Listener, CommandExecutor, Tab
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onCreativeInventoryClick(InventoryClickEvent event) {
         if (!(event.getWhoClicked() instanceof Player player) || !isCreative(player)) return;
-
         InventoryType topType = event.getView().getTopInventory().getType();
         if (topType != InventoryType.CRAFTING && topType != InventoryType.CREATIVE
                 && topType != InventoryType.PLAYER) {
             event.setCancelled(true);
             return;
         }
-        if (isRestricted(event.getCurrentItem()) || isRestricted(event.getCursor())) {
-            event.setCancelled(true);
-        }
+        if (isRestricted(event.getCurrentItem()) || isRestricted(event.getCursor())) event.setCancelled(true);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onCreativeInventory(InventoryCreativeEvent event) {
         if (!(event.getWhoClicked() instanceof Player player) || !isCreative(player)) return;
-        if (isRestricted(event.getCursor()) || isRestricted(event.getCurrentItem())) {
-            event.setCancelled(true);
-        }
+        if (isRestricted(event.getCursor()) || isRestricted(event.getCurrentItem())) event.setCancelled(true);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -366,9 +368,7 @@ public final class AdminCommandManager implements Listener, CommandExecutor, Tab
             return;
         }
         if (isRestricted(event.getOldCursor())
-                || event.getNewItems().values().stream().anyMatch(this::isRestricted)) {
-            event.setCancelled(true);
-        }
+                || event.getNewItems().values().stream().anyMatch(this::isRestricted)) event.setCancelled(true);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -380,9 +380,7 @@ public final class AdminCommandManager implements Listener, CommandExecutor, Tab
     public void onCreativePickup(EntityPickupItemEvent event) {
         Entity entity = event.getEntity();
         if (entity instanceof Player player && isCreative(player)
-                && isRestricted(event.getItem().getItemStack())) {
-            event.setCancelled(true);
-        }
+                && isRestricted(event.getItem().getItemStack())) event.setCancelled(true);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -391,5 +389,18 @@ public final class AdminCommandManager implements Listener, CommandExecutor, Tab
             event.setCancelled(true);
             event.getPlayer().sendMessage("§cThat block is restricted in Creative mode.");
         }
+    }
+
+    @Override
+    public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
+        if (!sender.hasPermission(GAME_MODE_PERMISSION)) return List.of();
+        String name = command.getName().toLowerCase(Locale.ROOT);
+        if (!Set.of("gmc", "gms", "gmsp").contains(name) || args.length != 1) return List.of();
+        String prefix = args[0].toLowerCase(Locale.ROOT);
+        return Bukkit.getOnlinePlayers().stream()
+                .map(Player::getName)
+                .filter(playerName -> playerName.toLowerCase(Locale.ROOT).startsWith(prefix))
+                .sorted(String.CASE_INSENSITIVE_ORDER)
+                .toList();
     }
 }
