@@ -44,3 +44,5 @@ permissions:
   survival.admin.weather:
     description: Allows using /sun, /rain and /thunder
     default: op
+
+# Gamemode targets accept Bukkit player selectors such as @a, @p, @r, @s and @e[type=player].
