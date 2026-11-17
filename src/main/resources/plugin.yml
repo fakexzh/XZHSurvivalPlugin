@@ -44,3 +44,5 @@ permissions:
   survival.admin.weather:
     description: Allows using /sun, /rain and /thunder
     default: op
+
+# Gamemode commands accept vanilla player selectors as targets.
