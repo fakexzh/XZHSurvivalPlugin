@@ -11,15 +11,15 @@ commands:
     usage: /timecycle <status|day|night|setday|setnight|pause|resume|reload|reset>
   gmc:
     description: Switch to the isolated Creative inventory
-    usage: /gmc [player]
+    usage: /gmc [player|selector]
     permission: survival.admin.gamemode
   gms:
     description: Restore the Survival inventory and gamemode
-    usage: /gms [player]
+    usage: /gms [player|selector]
     permission: survival.admin.gamemode
   gmsp:
     description: Switch to Spectator while preserving both inventories
-    usage: /gmsp [player]
+    usage: /gmsp [player|selector]
     permission: survival.admin.gamemode
   sun:
     description: Set clear weather
