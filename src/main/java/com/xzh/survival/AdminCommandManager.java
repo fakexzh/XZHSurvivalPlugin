@@ -70,7 +70,8 @@ public final class AdminCommandManager implements CommandExecutor, TabCompleter,
             return true;
         }
 
-        if (delegated && !admin(sender) && args.length > 0) {
+        if (delegated && !admin(sender) && args.length > 0
+                && !(cmd.equals("weather") && args.length == 1)) {
             sender.sendMessage("§cTemporary delegated powers can only be used on yourself.");
             return true;
         }
