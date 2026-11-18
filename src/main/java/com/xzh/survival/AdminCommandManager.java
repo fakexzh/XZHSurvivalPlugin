@@ -74,8 +74,21 @@ public final class AdminCommandManager implements CommandExecutor, TabCompleter,
             sender.sendMessage("§cTemporary delegated powers can only be used on yourself.");
             return true;
         }
+        boolean targetArgument = switch (cmd) {
+            case "gmc", "gms", "gma", "gmsp", "heal", "feed", "fly", "unfly" -> args.length == 1;
+            case "gamemode", "gm" -> args.length == 2;
+            default -> false;
+        };
+        if (cmd.equals("unfly") && args.length != 1) {
+            sender.sendMessage("§cUsage: /unfly <player>");
+            return true;
+        }
+        if (Set.of("gmc", "gms", "gma", "gmsp", "heal", "feed").contains(cmd) && args.length > 1) {
+            sender.sendMessage("§cUsage: /" + cmd + " [player]");
+            return true;
+        }
         Player target = self;
-        if (args.length > 0) {
+        if (targetArgument) {
             if (!admin(sender)) {
                 sender.sendMessage("§cYou can only use this power on yourself.");
                 return true;
