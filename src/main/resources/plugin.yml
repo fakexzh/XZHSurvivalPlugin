@@ -10,13 +10,45 @@ commands:
     description: Manage independent day and night durations
     usage: /timecycle <status|day|night|setday|setnight|pause|resume|reload|reset>
   fly:
-    description: Grant a player permission to fly
-    usage: /fly <player>
-    permission: survival.admin.fly
+    description: Toggle your flight or grant flight to an online player
+    usage: /fly [player]
   unfly:
-    description: Revoke a player's ability to fly
+    description: Revoke an online player's flight ability
     usage: /unfly <player>
-    permission: survival.admin.unfly
+  gmc:
+    description: Set yourself or a player to Creative
+    usage: /gmc [player]
+  gms:
+    description: Set yourself or a player to Survival
+    usage: /gms [player]
+  gma:
+    description: Set yourself or a player to Adventure
+    usage: /gma [player]
+  gmsp:
+    description: Set yourself or a player to Spectator
+    usage: /gmsp [player]
+  gamemode:
+    description: Change gamemode
+    usage: /gamemode <mode> [player]
+    aliases: [gm]
+  day:
+    description: Set the current world to day
+    usage: /day
+  night:
+    description: Set the current world to night
+    usage: /night
+  heal:
+    description: Restore health
+    usage: /heal [player]
+  feed:
+    description: Restore hunger
+    usage: /feed [player]
+  weather:
+    description: Change weather
+    usage: /weather <clear|rain|thunder>
+  xzhpower:
+    description: Grant or revoke session-only admin powers
+    usage: /xzhpower <give|revoke|list|clear> <player> [power]
 
 # Admin flight controls are available to operators by default.
 permissions:
@@ -24,9 +56,6 @@ permissions:
     description: Allows managing the custom day and night cycle
     default: op
 
-  survival.admin.fly:
-    description: Allows granting flight ability to other players
-    default: op
-  survival.admin.unfly:
-    description: Allows revoking flight ability from other players
+  survival.admin.commands:
+    description: Allows using all Survival administrative commands and managing temporary powers
     default: op
